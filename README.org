@@ -4,7 +4,7 @@
  - [[#gerr-report-shortened-error-files-for-given-resdirs][gerr (report shortened error files for given resdirs)]]
  - [[#gdump-dump-symbol-from-temp-gdx-under-given-resdirs][gdump (dump symbol from temp gdx under given resdirs)]]
  - [[#gtemp-save-all-data-temp-from-two-consecutive-nash-iterations][gtemp (save all data temp from two consecutive Nash iterations)]]
- - [[#cleanwdir-cleancreate-proc-and-scen-dir][cleanwdir (clean/create proc and scen dir)]]
+ - [[#cleanwdir-cleancreate-procdir-and-resdir-w-common-name][cleanwdir (clean/create procdir and resdir w/ common name)]]
  - [[#useful-aliases][Useful aliases]]
    - [[#bw-show-running-jobs][bw (show running jobs)]]
    - [[#bwg-show-running-jobs-grepped][bwg (show running jobs grepped)]]
@@ -88,7 +88,7 @@ echo "${f} -> ${fname}_b.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*;d
 }
 #+END_SRC
 
-* cleanwdir (clean/create proc and scen dir)
+* cleanwdir (clean/create procdir and resdir w/ common name)
 #+BEGIN_EXAMPLE
 cleanwdir RESDIR
 #+END_EXAMPLE
