@@ -59,9 +59,9 @@ alias bw='bjobs -w'
 
 alias bwg='bjobs -w | egrep -i'
 
-alias baw='bjobs -aw | grep -i'
+alias bag='bjobs -aw | grep -i'
 
-alias blw='bjobs -aw | tail'
+alias bal='bjobs -aw | tail'
 
 alias bl='bjobs -l'
 
@@ -77,6 +77,6 @@ alias bk='bkill'
 
 alias bkj='bkill -J'
 
-alias lls='ls -lct | head -n20'
+alias lsl='ls -lct | head -n20'
 
-alias ldls='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
+alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'

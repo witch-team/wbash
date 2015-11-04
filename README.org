@@ -1,14 +1,14 @@
 #+PROPERTY: header-args:sh :tangle .shrc-witch
 * TOC                                                                   :TOC:
- - [[#gerr-resdir1-resdir2-][gerr RESDIR1 [RESDIR2 ...]]]
- - [[#gdump-symb-resdir1-resdir2-][gdump SYMB RESDIR1 [RESDIR2 ...]]]
- - [[#gtemp-resdir][gtemp RESDIR]]
- - [[#cleanwdir-resdir][cleanwdir RESDIR]]
+ - [[#gerr-report-shortened-error-files-for-given-resdirs][gerr (report shortened error files for given resdirs)]]
+ - [[#gdump-dump-symbol-from-temp-gdx-under-given-resdirs][gdump (dump symbol from temp gdx under given resdirs)]]
+ - [[#gtemp-save-all-data-temp-from-two-consecutive-nash-iterations][gtemp (save all data temp from two consecutive Nash iterations)]]
+ - [[#cleanwdir-cleancreate-proc-and-scen-dir][cleanwdir (clean/create proc and scen dir)]]
  - [[#useful-aliases][Useful aliases]]
    - [[#bw-show-running-jobs][bw (show running jobs)]]
    - [[#bwg-show-running-jobs-grepped][bwg (show running jobs grepped)]]
-   - [[#bawg-show-finished-jobs-grepped][bawg (show finished jobs grepped)]]
-   - [[#blw-show-recently-finished-jobs][blw (show recently finished jobs)]]
+   - [[#bag-show-finished-jobs-grepped][bag (show finished jobs grepped)]]
+   - [[#bal-show-recently-finished-jobs][bal (show recently finished jobs)]]
    - [[#bl-show-job-details-by-id][bl (show job details by id)]]
    - [[#blj-show-job-details-by-name][blj (show job details by name)]]
    - [[#bf-peek-into-job-by-id][bf (peek into job by id)]]
@@ -16,11 +16,13 @@
    - [[#bq-show-gamsserial-queues][bq (show gams/serial queues)]]
    - [[#bk-kill-job-by-id][bk (kill job by id)]]
    - [[#bkj-kill-job-by-name][bkj (kill job by name)]]
-   - [[#lls-show-most-recently-modified-files][lls (show most recently modified files)]]
-   - [[#ldls-show-most-recently-modified-directories][ldls (show most recently modified directories)]]
+   - [[#lsl-show-most-recently-modified-files][lsl (show most recently modified files)]]
+   - [[#lsld-show-most-recently-modified-directories][lsld (show most recently modified directories)]]
 
-* gerr RESDIR1 [RESDIR2 ...]
-Report shortened error files for given resdirs.
+* gerr (report shortened error files for given resdirs)
+#+BEGIN_EXAMPLE
+gerr RESDIR1 [RESDIR2 ...]
+#+END_EXAMPLE
 #+BEGIN_SRC sh
 gerr ()
 {
@@ -36,8 +38,10 @@ done
 }
 #+END_SRC
 
-* gdump SYMB RESDIR1 [RESDIR2 ...]
-Dump symbol ~SYMB~ from temp results gdx under RESDIR1, RESDIR2
+* gdump (dump symbol from temp gdx under given resdirs)
+#+BEGIN_EXAMPLE
+gdump SYMBOL RESDIR1 [RESDIR2 ...]
+#+END_EXAMPLE
 #+BEGIN_SRC sh
 gdump ()
 {
@@ -53,8 +57,11 @@ done
 }
 #+END_SRC
 
-* gtemp RESDIR
-Save all data temp from two consecutive Nash iterations, saving them as temp_XXX_a.gdx and temp_XXX_b.gdx.
+* gtemp (save all data temp from two consecutive Nash iterations)
+#+BEGIN_EXAMPLE
+gtemp RESDIR
+#+END_EXAMPLE
+Files are saved as temp_XXX_a.gdx and temp_XXX_b.gdx.
 #+BEGIN_SRC sh
 gtemp ()
 {
@@ -72,8 +79,11 @@ echo "${f} -> ${fname}_b.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*;d
 }
 #+END_SRC
 
-* cleanwdir RESDIR
-Clean or create ~225_$RESDIR~ and ~$RESDIR~ directories.
+* cleanwdir (clean/create proc and scen dir)
+#+BEGIN_EXAMPLE
+cleanwdir RESDIR
+#+END_EXAMPLE
+Clean/create ~225_$RESDIR~ and ~$RESDIR~ directories.
 #+BEGIN_SRC sh
 cleanwdir ()
 {
@@ -104,14 +114,14 @@ alias bw='bjobs -w'
 alias bwg='bjobs -w | egrep -i'
 #+END_SRC
 
-** bawg (show finished jobs grepped)
+** bag (show finished jobs grepped)
 #+BEGIN_SRC sh
-alias baw='bjobs -aw | grep -i'
+alias bag='bjobs -aw | grep -i'
 #+END_SRC
 
-** blw (show recently finished jobs)
+** bal (show recently finished jobs)
 #+BEGIN_SRC sh
-alias blw='bjobs -aw | tail'
+alias bal='bjobs -aw | tail'
 #+END_SRC
 
 ** bl (show job details by id)
@@ -152,12 +162,13 @@ alias bk='bkill'
 alias bkj='bkill -J'
 #+END_SRC
 
-** lls (show most recently modified files)
+** lsl (show most recently modified files)
 #+BEGIN_SRC sh
-alias lls='ls -lct | head -n20'
+alias lsl='ls -lct | head -n20'
 #+END_SRC
 
-** ldls (show most recently modified directories)
+** lsld (show most recently modified directories)
+225* directories are omitted.
 #+BEGIN_SRC sh
-alias ldls='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
+alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
 #+END_SRC
