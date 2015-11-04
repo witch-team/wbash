@@ -1,13 +1,25 @@
+#+PROPERTY: header-args:sh :tangle .shrc-witch
 * TOC                                                                   :TOC:
- - [[#error-files][Error files]]
-   - [[#gerr-resdir1-resdir2-][~gerr RESDIR1 RESDIR2~ ...]]
- - [[#gdx][GDX]]
-   - [[#][]]
- - [[#managing][Managing]]
-   - [[#cleanwdir-resdir][cleanwdir RESDIR]]
+ - [[#gerr-resdir1-resdir2-][gerr RESDIR1 [RESDIR2 ...]]]
+ - [[#gdump-symb-resdir1-resdir2-][gdump SYMB RESDIR1 [RESDIR2 ...]]]
+ - [[#gtemp-resdir][gtemp RESDIR]]
+ - [[#cleanwdir-resdir][cleanwdir RESDIR]]
+ - [[#useful-aliases][Useful aliases]]
+   - [[#bw-show-running-jobs][bw (show running jobs)]]
+   - [[#bwg-show-running-jobs-grepped][bwg (show running jobs grepped)]]
+   - [[#bawg-show-finished-jobs-grepped][bawg (show finished jobs grepped)]]
+   - [[#blw-show-recently-finished-jobs][blw (show recently finished jobs)]]
+   - [[#bl-show-job-details-by-id][bl (show job details by id)]]
+   - [[#blj-show-job-details-by-name][blj (show job details by name)]]
+   - [[#bf-peek-into-job-by-id][bf (peek into job by id)]]
+   - [[#bfj-peek-into-job-by-name][bfj (peek into job by name)]]
+   - [[#bq-show-gamsserial-queues][bq (show gams/serial queues)]]
+   - [[#bk-kill-job-by-id][bk (kill job by id)]]
+   - [[#bkj-kill-job-by-name][bkj (kill job by name)]]
+   - [[#lls-show-most-recently-modified-files][lls (show most recently modified files)]]
+   - [[#ldls-show-most-recently-modified-directories][ldls (show most recently modified directories)]]
 
-* Error files
-** ~gerr RESDIR1 RESDIR2~ ...
+* gerr RESDIR1 [RESDIR2 ...]
 Report shortened error files for given resdirs.
 #+BEGIN_SRC sh
 gerr ()
@@ -23,8 +35,9 @@ while [ "$1" != "" ]; do
 done
 }
 #+END_SRC
-* GDX
-** 
+
+* gdump SYMB RESDIR1 [RESDIR2 ...]
+Dump symbol ~SYMB~ from temp results gdx under RESDIR1, RESDIR2
 #+BEGIN_SRC sh
 gdump ()
 {
@@ -32,15 +45,34 @@ WHAT=$1
 shift
 while [ "$1" != "" ]; do
     for f in ${1}/all_data_temp*; do
-        echo -e "\n\e[33m${f}:\e[97m"
+        echo -e "\n\e[33m${f}:\e[97m" 1>&2 
         gdxdump $f symb=${WHAT}
     done
     shift
 done
 }
 #+END_SRC
-* Managing
-** cleanwdir RESDIR
+
+* gtemp RESDIR
+Save all data temp from two consecutive Nash iterations, saving them as temp_XXX_a.gdx and temp_XXX_b.gdx.
+#+BEGIN_SRC sh
+gtemp ()
+{
+workdir=$1
+match=''
+for f in ${workdir}/all_data_temp_${match}*; do
+fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
+until rsync ${f} ${fname}_a.gdx; do sleep 1; done
+ahash=$(md5sum ${fname}_a.gdx | cut -d' ' -f1)
+echo "${f} -> ${fname}_a.gdx (${ahash})"
+tail -n1 ${workdir}/errors_${match}*;bhash=$ahash
+while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
+until rsync ${f} ${fname}_b.gdx; do sleep 1; done
+echo "${f} -> ${fname}_b.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*;done
+}
+#+END_SRC
+
+* cleanwdir RESDIR
 Clean or create ~225_$RESDIR~ and ~$RESDIR~ directories.
 #+BEGIN_SRC sh
 cleanwdir ()
@@ -58,4 +90,74 @@ else
 mkdir -p ${SCENDIR}
 fi
 }
+#+END_SRC
+
+* Useful aliases
+
+** bw (show running jobs)
+#+BEGIN_SRC sh
+alias bw='bjobs -w'
+#+END_SRC
+
+** bwg (show running jobs grepped)
+#+BEGIN_SRC sh
+alias bwg='bjobs -w | egrep -i'
+#+END_SRC
+
+** bawg (show finished jobs grepped)
+#+BEGIN_SRC sh
+alias baw='bjobs -aw | grep -i'
+#+END_SRC
+
+** blw (show recently finished jobs)
+#+BEGIN_SRC sh
+alias blw='bjobs -aw | tail'
+#+END_SRC
+
+** bl (show job details by id)
+If no job id is given, show last submitted running job.
+#+BEGIN_SRC sh
+alias bl='bjobs -l'
+#+END_SRC
+
+** blj (show job details by name)
+#+BEGIN_SRC sh
+alias blj='bjobs -l -J'
+#+END_SRC
+
+** bf (peek into job by id)
+If no job id is given, show last submitted running job.
+#+BEGIN_SRC sh
+alias bf='bpeek -f'
+#+END_SRC
+
+** bfj (peek into job by name)
+#+BEGIN_SRC sh
+alias bfj='bpeek -f -J'
+#+END_SRC
+
+** bq (show gams/serial queues)
+#+BEGIN_SRC sh
+alias bq='bqueues | egrep "(QUEUE_NAME|serial|gams)"'
+#+END_SRC
+
+** bk (kill job by id)
+Provide 0 to kill all jobs.
+#+BEGIN_SRC sh
+alias bk='bkill'
+#+END_SRC
+
+** bkj (kill job by name)
+#+BEGIN_SRC sh
+alias bkj='bkill -J'
+#+END_SRC
+
+** lls (show most recently modified files)
+#+BEGIN_SRC sh
+alias lls='ls -lct | head -n20'
+#+END_SRC
+
+** ldls (show most recently modified directories)
+#+BEGIN_SRC sh
+alias ldls='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
 #+END_SRC

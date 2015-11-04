@@ -1,0 +1,82 @@
+gerr ()
+{
+while [ "$1" != "" ]; do
+    for f in ${1}/err*; do
+        echo -e "\n\e[33m${f}:\e[97m"
+        head -n4 $f
+        egrep -i '^>>>>' $f
+        tail -n5 $f
+    done
+    shift
+done
+}
+
+gdump ()
+{
+WHAT=$1
+shift
+while [ "$1" != "" ]; do
+    for f in ${1}/all_data_temp*; do
+        echo -e "\n\e[33m${f}:\e[97m" 1>&2 
+        gdxdump $f symb=${WHAT}
+    done
+    shift
+done
+}
+
+gtemp ()
+{
+workdir=$1
+match=''
+for f in ${workdir}/all_data_temp_${match}*; do
+fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
+until rsync ${f} ${fname}_a.gdx; do sleep 1; done
+ahash=$(md5sum ${fname}_a.gdx | cut -d' ' -f1)
+echo "${f} -> ${fname}_a.gdx (${ahash})"
+tail -n1 ${workdir}/errors_${match}*;bhash=$ahash
+while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
+until rsync ${f} ${fname}_b.gdx; do sleep 1; done
+echo "${f} -> ${fname}_b.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*;done
+}
+
+cleanwdir ()
+{
+SCENDIR=$1
+PROCDIR=225_${SCENDIR}
+if [ -d ${PROCDIR} ]; then
+rm -rf ${PROCDIR}/*
+else
+mkdir -p ${PROCDIR}
+fi
+if [ -d ${SCENDIR} ]; then
+rm ${SCENDIR}/{*lst,job*{out,err}}
+else
+mkdir -p ${SCENDIR}
+fi
+}
+
+alias bw='bjobs -w'
+
+alias bwg='bjobs -w | egrep -i'
+
+alias baw='bjobs -aw | grep -i'
+
+alias blw='bjobs -aw | tail'
+
+alias bl='bjobs -l'
+
+alias blj='bjobs -l -J'
+
+alias bf='bpeek -f'
+
+alias bfj='bpeek -f -J'
+
+alias bq='bqueues | egrep "(QUEUE_NAME|serial|gams)"'
+
+alias bk='bkill'
+
+alias bkj='bkill -J'
+
+alias lls='ls -lct | head -n20'
+
+alias ldls='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
