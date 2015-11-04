@@ -1,0 +1,61 @@
+* TOC                                                                   :TOC:
+ - [[#error-files][Error files]]
+   - [[#gerr-resdir1-resdir2-][~gerr RESDIR1 RESDIR2~ ...]]
+ - [[#gdx][GDX]]
+   - [[#][]]
+ - [[#managing][Managing]]
+   - [[#cleanwdir-resdir][cleanwdir RESDIR]]
+
+* Error files
+** ~gerr RESDIR1 RESDIR2~ ...
+Report shortened error files for given resdirs.
+#+BEGIN_SRC sh
+gerr ()
+{
+while [ "$1" != "" ]; do
+    for f in ${1}/err*; do
+        echo -e "\n\e[33m${f}:\e[97m"
+        head -n4 $f
+        egrep -i '^>>>>' $f
+        tail -n5 $f
+    done
+    shift
+done
+}
+#+END_SRC
+* GDX
+** 
+#+BEGIN_SRC sh
+gdump ()
+{
+WHAT=$1
+shift
+while [ "$1" != "" ]; do
+    for f in ${1}/all_data_temp*; do
+        echo -e "\n\e[33m${f}:\e[97m"
+        gdxdump $f symb=${WHAT}
+    done
+    shift
+done
+}
+#+END_SRC
+* Managing
+** cleanwdir RESDIR
+Clean or create ~225_$RESDIR~ and ~$RESDIR~ directories.
+#+BEGIN_SRC sh
+cleanwdir ()
+{
+SCENDIR=$1
+PROCDIR=225_${SCENDIR}
+if [ -d ${PROCDIR} ]; then
+rm -rf ${PROCDIR}/*
+else
+mkdir -p ${PROCDIR}
+fi
+if [ -d ${SCENDIR} ]; then
+rm ${SCENDIR}/{*lst,job*{out,err}}
+else
+mkdir -p ${SCENDIR}
+fi
+}
+#+END_SRC
