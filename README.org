@@ -1,5 +1,6 @@
 #+PROPERTY: header-args:sh :tangle .shrc-witch
 * TOC                                                                   :TOC:
+ - [[#installation][Installation]]
  - [[#gerr-report-shortened-error-files-for-given-resdirs][gerr (report shortened error files for given resdirs)]]
  - [[#gdump-dump-symbol-from-temp-gdx-under-given-resdirs][gdump (dump symbol from temp gdx under given resdirs)]]
  - [[#gtemp-save-all-data-temp-from-two-consecutive-nash-iterations][gtemp (save all data temp from two consecutive Nash iterations)]]
@@ -18,6 +19,14 @@
    - [[#bkj-kill-job-by-name][bkj (kill job by name)]]
    - [[#lsl-show-most-recently-modified-files][lsl (show most recently modified files)]]
    - [[#lsld-show-most-recently-modified-directories][lsld (show most recently modified directories)]]
+
+* Installation
+#+BEGIN_SRC sh :tangle no
+cd
+git clone https://github.com/jackjackk/shrc-witch.git
+echo "source ~/shrc-witch/.shrc-witch" >>.bashrc
+. ~/.bashrc
+#+END_SRC
 
 * gerr (report shortened error files for given resdirs)
 #+BEGIN_EXAMPLE
