@@ -27,8 +27,8 @@ done
 
 wtemp ()
 {
-workdir=$1
-match=''
+workdir="$1"
+match="$2"
 for f in ${workdir}/all_data_temp_${match}*; do
 fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
 until rsync ${f} ${fname}_a.gdx; do sleep 1; done
