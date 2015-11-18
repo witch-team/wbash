@@ -62,6 +62,42 @@ mkdir -p ${SCENDIR}
 fi
 }
 
+gdiff ()
+{
+    type dwdiff &>nul 2>&1;
+    if [ $? -eq 0 ]; then
+        CMD=dwdiff;
+    else
+        if [ ! -f dwdiff ]; then
+            echo 'WARN: dwdiff tool not found... downloading'
+            curl http://os.ghalkes.nl/dist/dwdiff-2.1.0.tar.bz2 > dwdiff-2.1.0.tar.bz2
+            tar xjf dwdiff-2.1.0.tar.bz2 
+            cd dwdiff-2.1.0
+            ./configure
+            make all
+            mv dwdiff ../
+            cd ..
+            rm -rf dwdiff-2.1.0.tar.bz2 dwdiff-2.1.0
+            CMD=./dwdiff;
+        fi
+    fi;
+    SYMB=$1;
+    rm zzz_*
+    MATCHES=$2
+    DMPLIST=(one two);
+    IGDX=0;
+    AWKPARAM="/\"$(sed 's|,|[a-z]*"/ \&\& /"|g' <<<"${MATCHES}")[a-z]*\"/"
+    for GDX in ${@:3};
+    do
+        echo $GDX;
+        DMP=zzz_${GDX%gdx}txt;
+        gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
+        DMPLIST[IGDX]=$DMP;
+        let IGDX=IGDX+1;
+    done;
+    $CMD -c -L -d' ,.' ${DMPLIST[@]}
+}
+
 alias bw='bjobs -w'
 
 alias bwg='bjobs -w | egrep -i'
