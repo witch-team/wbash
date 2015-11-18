@@ -128,7 +128,7 @@ gdiff SYMBOL "COMMA,SEPARATED,MATCHES" GDX1 GDX2
 Inline comparison of ~$SYMBOL~ values between ~$GDX1~ and ~$GDX2~, considering
 only those entries matching the provided strings. Partial match assumed except
 for numbers (e.g. "ura" will match "uranium", but "1" will just match "1", not
-"10").
+"10"). MAKE SURE YOU DON'T USE ANY "zzz_*" FILES!
 #+BEGIN_SRC sh
   gdiff ()
   {
@@ -164,6 +164,7 @@ for numbers (e.g. "ura" will match "uranium", but "1" will just match "1", not
           let IGDX=IGDX+1;
       done;
       $CMD -c -L -d' ,.' ${DMPLIST[@]}
+      rm zzz_*
   }
 
 #+END_SRC

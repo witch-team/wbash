@@ -96,6 +96,7 @@ gdiff ()
         let IGDX=IGDX+1;
     done;
     $CMD -c -L -d' ,.' ${DMPLIST[@]}
+    rm zzz_*
 }
 
 alias bw='bjobs -w'
