@@ -6,6 +6,7 @@
  - [[#wtemp-save-all-data-temp-from-two-consecutive-nash-iterations][wtemp (save all data temp from two consecutive Nash iterations)]]
  - [[#wclean-remove-225-lstouterr][wclean (remove 225*, */*{lst,out,err})]]
  - [[#wcleandir-cleancreate-procdir-and-resdir-w-common-name][wcleandir (clean/create procdir and resdir w/ common name)]]
+ - [[#wrun-run-witch][wrun (run WITCH)]]
  - [[#gdiff-compare-two-gdx-files][gdiff (compare two gdx files)]]
  - [[#useful-aliases][Useful aliases]]
    - [[#bw-show-running-jobs][bw (show running jobs)]]
@@ -121,6 +122,20 @@ fi
 }
 #+END_SRC
 
+* wrun (run WITCH)
+#+BEGIN_EXAMPLE
+wrun bau 2 --policy=bau
+#+END_EXAMPLE
+Run WITCH with argument ~--policy=bau~ under a job named ~bau~ with 2 processors.
+#+BEGIN_SRC sh
+wrun ()
+{
+RUN=$1
+NPROC=$2
+mkdir -p ${RUN} 225_${RUN}
+bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --workdir=$RUN --gdxout=results_${RUN} ${@:3}
+}
+#+END_SRC
 * gdiff (compare two gdx files)
 #+BEGIN_EXAMPLE
 gdiff SYMBOL "COMMA,SEPARATED,MATCHES" GDX1 GDX2

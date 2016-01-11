@@ -62,6 +62,14 @@ mkdir -p ${SCENDIR}
 fi
 }
 
+wrun ()
+{
+RUN=$1
+NPROC=$2
+mkdir -p ${RUN} 225_${RUN}
+bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --workdir=$RUN --gdxout=results_${RUN} ${@:3}
+}
+
 gdiff ()
 {
     type dwdiff &>nul 2>&1;
