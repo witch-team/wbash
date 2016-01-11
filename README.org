@@ -143,7 +143,7 @@ gdiff SYMBOL "COMMA,SEPARATED,MATCHES" GDX1 GDX2
 Inline comparison of ~$SYMBOL~ values between ~$GDX1~ and ~$GDX2~, considering
 only those entries matching the provided strings. Partial match assumed except
 for numbers (e.g. "ura" will match "uranium", but "1" will just match "1", not
-"10"). MAKE SURE YOU DON'T USE ANY "zzz_*" FILES!
+"10"). MAKE SURE YOU DON'T USE ANY "*zzz.txt" FILES!
 #+BEGIN_SRC sh
   gdiff ()
   {
@@ -173,7 +173,7 @@ for numbers (e.g. "ura" will match "uranium", but "1" will just match "1", not
       do
           echo $GDX;
           DMP=${GDX%.gdx}zzz.txt;
-          rm -p "$DMP"
+          rm -fv "$DMP"
           gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
           DMPLIST[IGDX]=$DMP;
           let IGDX=IGDX+1;

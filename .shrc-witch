@@ -98,7 +98,7 @@ gdiff ()
     do
         echo $GDX;
         DMP=${GDX%.gdx}zzz.txt;
-        rm -p "$DMP"
+        rm -fv "$DMP"
         gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
         DMPLIST[IGDX]=$DMP;
         let IGDX=IGDX+1;
