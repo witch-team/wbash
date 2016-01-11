@@ -40,7 +40,7 @@ werr ()
 {
 while [ "$1" != "" ]; do
     for f in ${1}/err*; do
-        echo -e "\n\e[33m${f}:\e[97m"
+        echo -e "\n\e[33m${f}:\e[0m"
         head -n4 $f
         egrep -i '^>>>>' $f
         tail -n5 $f
@@ -61,7 +61,7 @@ WHAT=$1
 shift
 while [ "$1" != "" ]; do
     for f in ${1}/all_data_temp*gdx; do
-        echo -e "\n\e[33m${f}:\e[97m" 1>&2 
+        echo -e "\n\e[33m${f}:\e[0m" 1>&2 
         gdxdump $f symb=${WHAT}
     done
     shift
