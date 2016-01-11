@@ -90,7 +90,6 @@ gdiff ()
         fi
     fi;
     SYMB=$1;
-    rm zzz_*
     MATCHES=$2
     DMPLIST=(one two);
     IGDX=0;
@@ -98,13 +97,13 @@ gdiff ()
     for GDX in ${@:3};
     do
         echo $GDX;
-        DMP=zzz_${GDX%gdx}txt;
+        DMP=${GDX%.gdx}zzz.txt;
+        rm -p "$DMP"
         gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
         DMPLIST[IGDX]=$DMP;
         let IGDX=IGDX+1;
     done;
     $CMD -c -L -d' ,.' ${DMPLIST[@]}
-    rm zzz_*
 }
 
 alias bw='bjobs -w'
