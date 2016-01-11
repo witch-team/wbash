@@ -17,7 +17,7 @@ wdump ()
 WHAT=$1
 shift
 while [ "$1" != "" ]; do
-    for f in ${1}/all_data_temp*; do
+    for f in ${1}/all_data_temp*gdx; do
         echo -e "\n\e[33m${f}:\e[97m" 1>&2 
         gdxdump $f symb=${WHAT}
     done
