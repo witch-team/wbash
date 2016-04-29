@@ -4,9 +4,9 @@ werr ()
 while [ "$1" != "" ]; do
     for f in ${1}/err*; do
         echo -e "\n\e[33m${f}:\e[0m"
-        head -n4 $f
-        egrep -i '^>>>>' $f
-        tail -n5 $f
+        head -n5 $f
+        egrep -i '^> [a-z]' $f | tail -n1
+        tail --lines=+6 $f | tail -n5
     done
     shift
 done
@@ -67,7 +67,7 @@ wrun ()
 RUN=$1
 NPROC=$2
 mkdir -p ${RUN} 225_${RUN}
-bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --workdir=$RUN --gdxout=results_${RUN} ${@:3}
+bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 ${@:3}
 }
 
 gdiff ()
