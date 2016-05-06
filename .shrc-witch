@@ -72,7 +72,7 @@ bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.
 
 wcrun ()
 {
-wrun $1 $2 --startgdx=$3 --baugdx=$3 --calibgdx=$3 --tfpgdx=$3 --calibration=1 --startboost=1 {@:4}
+wrun $1 $2 --startgdx=$3 --baugdx=$3 --calibgdx=$3 --tfpgdx=$3 --calibration=1 --startboost=1 ${@:4}
 }      
 
 gdiff ()
