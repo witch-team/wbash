@@ -70,6 +70,11 @@ mkdir -p ${RUN} 225_${RUN}
 bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 ${@:3}
 }
 
+wcrun ()
+{
+wrun $1 $2 --startgdx=$3 --baugdx=$3 --calibgdx=$3 --tfpgdx=$3 --calibration=1 --startboost=1 {@:4}
+}      
+
 gdiff ()
 {
     type dwdiff &>nul 2>&1;
