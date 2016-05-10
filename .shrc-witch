@@ -69,13 +69,13 @@ wcleandir ${RUN}
 NPROC=$2
 mkdir -p ${RUN} 225_${RUN}
 EXTRA_ARGS=""
-if [[ ! "${@:3}" == *"startgdx="* ]]; then
-PREV_CONV="$(gdxdump ${RUN}/results_${RUN}.gdx symb=stop_nash format=csv | tail -n1)"
-[ $PREV_CONV="1" ] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
-[ $PREV_CONV="1" ] && [[ ${RUN} == *"bau"* ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
+PREV_CONV="$(gdxdump ${RUN}/results_${RUN}.gdx symb=stop_nash format=csv | tail -n1 | sed 's/[[:space:]]//g')"
+if [[ $PREV_CONV =~ ^1$ ]]; then
+[[ ! ${@:3} =~ startgdx ]] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
+[[ ! ${@:3} =~ startgdx ]] && [[ ! ${@:3} =~ gdxfix ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
+[[ ! ${@:3} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
 fi
-[[ ! "${@:3}" == *"gdxfix="* ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
-[ ! -z $EXTRA_ARGS ] && echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
+[ -z "$EXTRA_ARGS" ] || echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
 bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 ${EXTRA_ARGS} ${@:3}
 }
 
