@@ -84,7 +84,7 @@ if [[ $PREV_CONV =~ ^1$ ]]; then
 [[ ! ${@:3} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
 fi
 [ -z "$EXTRA_ARGS" ] || echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
-bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 ${EXTRA_ARGS} ${@:3}
+bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms gdxcompress=1 Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 ${EXTRA_ARGS} ${@:3}
 }
 
 wrun ()
