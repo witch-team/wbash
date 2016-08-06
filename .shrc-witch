@@ -170,6 +170,6 @@ alias bk='bkill'
 
 alias bkj='bkill -J'
 
-alias lsl='ls -lct | head -n20'
+alias lsl='ls -lcth | head -n20'
 
 alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
