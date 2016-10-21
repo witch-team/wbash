@@ -112,6 +112,13 @@ wfrun ()
 wbrun $1 $2 $3 --gdxfix=$3 ${@:4}
 }      
 
+wtax ()
+{
+TFIX=$(expr $4 - 1)
+echo "Carbon tax starting in period $4 at $5 USD2005/tCO2 and growing at $6 rate"
+wfrun $1 $2 $3 --tfix=${TFIX} --policy=ctax --tax_start=$4 --ctax2015=$5 --ctaxgrowth=$6 ${@:7}
+}      
+
 wfind ()
 {
 grep -i $1 *.gms */*.gms
