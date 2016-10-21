@@ -107,6 +107,11 @@ wcrun ()
 wbrun $1 $2 $3 --calibration=1 ${@:4}
 }      
 
+wfrun ()
+{
+wbrun $1 $2 $3 --gdxfix=$3 ${@:4}
+}      
+
 wfind ()
 {
 grep -i $1 *.gms */*.gms
