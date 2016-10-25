@@ -71,52 +71,70 @@ fi
 wrun_general ()
 {
 QUEUE=$1
-shift
-RUN=$1
+RUN=$2
+NPROC=$3
 wcleandir ${RUN}
-NPROC=$2
 mkdir -p ${RUN} 225_${RUN}
 EXTRA_ARGS=""
 PREV_CONV="$(gdxdump ${RUN}/results_${RUN}.gdx symb=stop_nash format=csv | tail -n1 | sed 's/[[:space:]]//g')"
 if [[ $PREV_CONV =~ ^1$ ]]; then
-[[ ! ${@:3} =~ startgdx ]] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
-[[ ! ${@:3} =~ startgdx ]] && [[ ! ${@:3} =~ gdxfix ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
-[[ ! ${@:3} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
+[[ ! ${@:4} =~ startgdx ]] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
+[[ ! ${@:4} =~ startgdx ]] && [[ ! ${@:4} =~ gdxfix ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
+[[ ! ${@:4} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
 fi
 [ -z "$EXTRA_ARGS" ] || echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
-bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms gdxcompress=1 Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 --parallel=incore ${EXTRA_ARGS} ${@:3}
+bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms gdxcompress=1 Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 --parallel=incore ${EXTRA_ARGS} ${@:4}
 }
 
 wrun ()
 {
-wrun_general serial_24h ${@}
+RUN=$1
+NPROC=$2
+wrun_general serial_24h ${RUN} ${NPROC} ${@:3}
 }
 
 wrun6 ()
 {
-wrun_general serial_6h ${@}
+RUN=$1
+NPROC=$2
+wrun_general serial_6h ${RUN} ${NPROC} ${@:3}
 }
 
 wbrun ()
 {
-wrun $1 $2 --startgdx=$3 --baugdx=$3 --calibgdx=$3 --tfpgdx=$3 --startboost=1 ${@:4}
+RUN=$1
+NPROC=$2
+BASEGDX=$3
+wrun ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
 }      
 
 wcrun ()
 {
-wbrun $1 $2 $3 --calibration=1 ${@:4}
+RUN=$1
+NPROC=$2
+BASEGDX=$3
+wbrun ${RUN} ${NPROC} ${BASEGDX} --calibration=1 ${@:4}
 }      
 
 wfrun ()
 {
-wbrun $1 $2 $3 --gdxfix=$3 ${@:4}
+RUN=$1
+NPROC=$2
+BASEGDX=$3
+wbrun ${RUN} ${NPROC} ${BASEGDX} --gdxfix=${BASEGDX} ${@:4}
 }      
 
 wtax ()
 {
-TFIX=$(expr $4 - 1)
-echo "Carbon tax starting in period $4 at $5 USD2005/tCO2 and growing at $6 rate"
-wfrun $1 $2 $3 --tfix=${TFIX} --policy=ctax --tax_start=$4 --ctax2015=$5 --ctaxgrowth=$6 ${@:7}
+RUN=$1
+NPROC=$2
+BASEGDX=$3
+TAXSTARTPERIOD=$4
+TAXSTARTVAL=$5
+TAXGROWTHRATE=$6
+TFIX=$(expr ${TAXSTARTPERIOD} - 1)
+echo "Carbon tax starting in period ${TAXSTARTPERIOD} at ${TAXSTARTVAL} USD2005/tCO2 and growing at ${TAXGROWTHRATE} rate"
+wfrun ${RUN} ${NPROC} ${BASEGDX} --tfix=${TFIX} --policy=ctax --tax_start=${TAXSTARTPERIOD} --ctax2015=${TAXSTARTVAL} --ctaxgrowth=${TAXGROWTHRATE} ${@:7}
 }      
 
 wfind ()
