@@ -108,6 +108,14 @@ BASEGDX=$3
 wrun ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
 }      
 
+wbrun6 ()
+{
+RUN=$1
+NPROC=$2
+BASEGDX=$3
+wrun6 ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
+}      
+
 wcrun ()
 {
 RUN=$1
