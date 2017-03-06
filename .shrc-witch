@@ -147,7 +147,7 @@ wfrun ${RUN} ${NPROC} ${BASEGDX} --tfix=${TFIX} --policy=ctax --tax_start=${TAXS
 
 wfind ()
 {
-grep -i $1 *.gms */*.gms
+grep -i "$1" *.gms */*.gms
 }
 
 gdiff ()
