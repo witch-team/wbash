@@ -125,7 +125,7 @@ wsub () {
     fi
     if [ -n "$START" ]; then
         if [ -f $START ]; then
-            cp -v $START $(basename $START)
+            ${RSYNC} $START $(basename $START)
             START=$(basename $START)
             ${RSYNC} $START ${DEST}/
         else
@@ -137,7 +137,7 @@ wsub () {
     fi
     if [ -n "$BAU" ]; then
         if [ -f $BAU ]; then
-            cp -v $BAU $(basename $BAU)
+            ${RSYNC} $BAU $(basename $BAU)
             BAU=$(basename $BAU)
             ${RSYNC} $BAU ${DEST}/
         else
@@ -147,7 +147,7 @@ wsub () {
     fi
     if [ -n "$FIX" ]; then
         if [ -f $FIX ]; then
-            cp -v $FIX $(basename $FIX)
+            ${RSYNC} $FIX $(basename $FIX)
             FIX=$(basename $FIX)
             ${RSYNC} $FIX ${DEST}/
         else            
