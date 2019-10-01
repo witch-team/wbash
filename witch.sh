@@ -44,62 +44,68 @@ wsub () {
     RESDIR_CALIB=""
     USE_CALIB=""
     START=""
+    STARTBOOST=""
     BAU=""
     FIX=""
+    DEST="${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
             # WITCH
-            -s|--start)
+            -s|-start)
                 START="$2"
                 shift
                 shift
                 ;;   
+            -S|-startboost)
+                STARTBOOST=TRUE
+                shift
+                ;; 
             -b|--bau)
                 BAU="$2"
                 shift
                 shift
                 ;;   
-            -f|--gdxfix)
+            -f|-gdxfix)
                 FIX="$2"
                 shift
                 shift
                 ;;
-            -d|--debug)
+            -d|-debug)
                 DEBUG=TRUE
                 shift
                 ;;            
             # CALIBRATION
-            -c|--calib)
+            -c|-calib)
                 CALIB=TRUE
                 shift
                 ;;
-            -C|--resdircalib)
+            -C|-resdircalib)
                 RESDIR_CALIB=TRUE
                 CALIB=TRUE
                 shift
                 ;;
-            -u|--usecalib)
+            -u|-usecalib)
                 USE_CALIB="$2"
                 shift
                 shift
                 ;;
             # BSUB
-            -j|--job)
+            -j|-job)
                 JOB_NAME="$2"
                 shift
                 shift
                 ;;
-            -i|--interactive)
+            -i|-interactive)
                 BSUB_INTERACTIVE=TRUE
                 shift
                 ;;
-            -q|--queue)
+            -q|-queue)
                 QUEUE="$2"
                 shift
                 shift
                 ;;
-            -n|--nproc)
+            -n|-nproc)
                 NPROC="$2"
                 shift
                 shift
@@ -118,24 +124,43 @@ wsub () {
         [ -z "$START" ] && START="${USE_CALIB}/results_${USE_CALIB}.gdx"
     fi
     if [ -n "$START" ]; then
-        [[ $START == *.gdx ]] || START="${START}/results_${START}.gdx"
+        if [ -f $START ]; then
+            cp -v $START $(basename $START)
+            START=$(basename $START)
+            ${RSYNC} $START ${DEST}/
+        else
+            START="${START}/results_${START}.gdx"
+        fi
         EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START}"
         [ -z "$BAU" ] && BAU="${START}"
         [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START}"
     fi
     if [ -n "$BAU" ]; then
-        [[ $BAU == *.gdx ]] || BAU="${BAU}/results_${BAU}.gdx"
+        if [ -f $BAU ]; then
+            cp -v $BAU $(basename $BAU)
+            BAU=$(basename $BAU)
+            ${RSYNC} $BAU ${DEST}/
+        else
+            BAU="${BAU}/results_${BAU}.gdx"
+        fi
         EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU}"
     fi
     if [ -n "$FIX" ]; then
-        [[ $FIX == *.gdx ]] || FIX="${FIX}/results_${FIX}.gdx"
+        if [ -f $FIX ]; then
+            cp -v $FIX $(basename $FIX)
+            FIX=$(basename $FIX)
+            ${RSYNC} $FIX ${DEST}/
+        else            
+            FIX="${FIX}/results_${FIX}.gdx"
+        fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
     fi
     [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_europe --parallel=false --holdfixed=0"
+    [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     wup
     BSUB=bsub
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I"
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
 }
 
@@ -150,17 +175,17 @@ wdata () {
         key="$1"
         case $key in
             # BSUB
-            -r|--regions)
+            -r|-regions)
                 REG_SETUP="$2"
                 shift
                 shift
                 ;;
-            -j|--job)
+            -j|-job)
                 JOB_NAME="$2"
                 shift
                 shift
                 ;;
-            -i|--interactive)
+            -i|-interactive)
                 BSUB_INTERACTIVE=TRUE
                 shift
                 ;;
@@ -175,7 +200,7 @@ wdata () {
     cd ../witchtools && wup && cd -
     BSUB=bsub
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
 }
 
