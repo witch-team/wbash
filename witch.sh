@@ -5,6 +5,7 @@ ERSYNC=
 DEFAULT_HOST=athena
 DEFAULT_WORKDIR=work
 DEFAULT_QUEUE=poe_medium
+DEFAULT_QUEUE_SHORT=poe_short
 DEFAULT_NPROC=8
 WAIT=TRUE
 
@@ -14,6 +15,7 @@ wdirname () {
     PWD="$(basename $(pwd))"
     DESTDIR=""
     [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
+    DESTDIR=${DESTDIR%-master}
     echo "${DESTDIR}"
 }
 
@@ -72,8 +74,9 @@ wsub () {
                 CALIB=TRUE
                 shift
                 ;;
-            -r|--resdircalib)
+            -C|--resdircalib)
                 RESDIR_CALIB=TRUE
+                CALIB=TRUE
                 shift
                 ;;
             -u|--usecalib)
@@ -135,6 +138,47 @@ wsub () {
     ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
 }
+
+wdata () {
+    END_ARGS=FALSE
+    QUEUE=${DEFAULT_QUEUE_SHORT}
+    NPROC=${DEFAULT_NPROC}
+    JOB_NAME=""
+    BSUB_INTERACTIVE=""
+    REG_SETUP="witch17"
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            # BSUB
+            -r|--regions)
+                REG_SETUP="$2"
+                shift
+                shift
+                ;;
+            -j|--job)
+                JOB_NAME="$2"
+                shift
+                shift
+                ;;
+            -i|--interactive)
+                BSUB_INTERACTIVE=TRUE
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    JOB_NAME="data_${REG_SETUP}"
+    wup
+    cd ../witch-data && wup && cd -
+    cd ../witchtools && wup && cd -
+    BSUB=bsub
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
+}
+
 
 wssh () {
    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $@"
