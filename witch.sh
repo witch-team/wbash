@@ -167,8 +167,6 @@ wsub () {
 wdata () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE_SHORT}
-    NPROC=${DEFAULT_NPROC}
-    JOB_NAME=""
     BSUB_INTERACTIVE=""
     REG_SETUP="witch17"
     while [ $END_ARGS = FALSE ]; do
@@ -177,11 +175,6 @@ wdata () {
             # BSUB
             -r|-regions)
                 REG_SETUP="$2"
-                shift
-                shift
-                ;;
-            -j|-job)
-                JOB_NAME="$2"
                 shift
                 shift
                 ;;
@@ -196,11 +189,11 @@ wdata () {
     done
     JOB_NAME="data_${REG_SETUP}"
     wup
-    cd ../witch-data && wup && cd -
-    cd ../witchtools && wup && cd -
+    cd ../witch-data && git pull && wup && cd -
+    cd ../witchtools && git pull && wup && cd -
     BSUB=bsub
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
 }
 
