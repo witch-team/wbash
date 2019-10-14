@@ -22,11 +22,15 @@ wdirname () {
 
 wup () {
     [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname), excluding non-git files" && return 1
-    TMPDIR="$(mktemp -d)"
-    ERSYNC="${RSYNC} --exclude-from=$(git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes; echo ${TMPDIR}/excludes) ${@} ./ ${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
+    RSYNCARGS="${@}"
+    TMPFILE=""
+    [ -z "$1" ] && \
+        TMPFILE="$(mktemp)" && \
+        RSYNCARGS="--exclude-from=$(git -C . ls-files --exclude-standard -oi > ${TMPFILE}; echo ${TMPFILE}) ./"
+    ERSYNC="${RSYNC} ${RSYNCARGS} ${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
     echo "${ERSYNC}"
     ${ERSYNC}
-    rm -r "${TMPDIR}"
+    [ -n "$TMPFILE" ] && rm -r "${TMPFILE}"
 }
 
 wdown () {
