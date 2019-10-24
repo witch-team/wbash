@@ -124,34 +124,43 @@ wsub () {
         [ -z "$START" ] && START="${USE_CALIB}/results_${USE_CALIB}.gdx"
     fi
     if [ -n "$START" ]; then
-        if [ -f $START ]; then
-            ${RSYNC} $START $(basename $START)
-            START=$(basename $START)
-            ${RSYNC} $START ${DEST}/
-        else
-            START="${START}/results_${START}.gdx"
+        wssh test -f "$START"
+        if [ ! $? -eq 0 ]; then
+            if [ -f $START ]; then
+                ${RSYNC} $START $(basename $START)
+                START=$(basename $START)
+                ${RSYNC} $START ${DEST}/
+            else
+                START="${START}/results_${START}.gdx"
+            fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START}"
         [ -z "$BAU" ] && BAU="${START}"
         [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START}"
     fi
     if [ -n "$BAU" ]; then
-        if [ -f $BAU ]; then
-            ${RSYNC} $BAU $(basename $BAU)
-            BAU=$(basename $BAU)
-            ${RSYNC} $BAU ${DEST}/
-        else
-            BAU="${BAU}/results_${BAU}.gdx"
+        wssh test -f "$BAU"
+        if [ ! $? -eq 0 ]; then
+            if [ -f $BAU ]; then
+                ${RSYNC} $BAU $(basename $BAU)
+                BAU=$(basename $BAU)
+                ${RSYNC} $BAU ${DEST}/
+            else
+                BAU="${BAU}/results_${BAU}.gdx"
+            fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU}"
     fi
     if [ -n "$FIX" ]; then
-        if [ -f $FIX ]; then
-            ${RSYNC} $FIX $(basename $FIX)
-            FIX=$(basename $FIX)
-            ${RSYNC} $FIX ${DEST}/
-        else            
-            FIX="${FIX}/results_${FIX}.gdx"
+        wssh test -f "$FIX"
+        if [ ! $? -eq 0 ]; then
+            if [ -f $FIX ]; then
+                ${RSYNC} $FIX $(basename $FIX)
+                FIX=$(basename $FIX)
+                ${RSYNC} $FIX ${DEST}/
+            else            
+                FIX="${FIX}/results_${FIX}.gdx"
+            fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
     fi
@@ -160,6 +169,7 @@ wsub () {
     wup
     BSUB=bsub
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I"
+    echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
 }
