@@ -155,7 +155,7 @@ wsub () {
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
     fi
-    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_europe --parallel=false --holdfixed=0"
+    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_usa --parallel=false --holdfixed=0"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     wup
     BSUB=bsub
