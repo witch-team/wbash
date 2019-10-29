@@ -150,7 +150,7 @@ wsub () {
                 fi
             fi
         fi
-        EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START}"
+        EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START%.gdx}"
         [ -z "$BAU" ] && BAU="${START}"
         [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START}"
     fi
