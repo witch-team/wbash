@@ -1,6 +1,6 @@
 #!/bin/bash
 
-RSYNC='/usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git'
+RSYNC='/usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git --relative'
 ERSYNC=
 DEFAULT_HOST=athena
 DEFAULT_WORKDIR=work
@@ -30,7 +30,7 @@ wup () {
 }
 
 wdown () {
-    ${RSYNC} "${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)/$1" ./
+    ${RSYNC} "${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)/./$1" .
 }
 
 wsub () {
@@ -137,7 +137,12 @@ wsub () {
                 START=$(basename $START)
                 ${RSYNC} $START ${DEST}/
             else
-                START="${START}/results_${START}.gdx"
+                START="${START}/results_$(basename ${START}).gdx"
+                wssh test -f "$START"
+                if [ ! $? -eq 0 ]; then
+                    echo "Unable to find $START"
+                    return 1
+                fi
             fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START}"
@@ -152,7 +157,12 @@ wsub () {
                 BAU=$(basename $BAU)
                 ${RSYNC} $BAU ${DEST}/
             else
-                BAU="${BAU}/results_${BAU}.gdx"
+                BAU="${BAU}/results_$(basename ${BAU}).gdx"
+                wssh test -f "$BAU"
+                if [ ! $? -eq 0 ]; then
+                    echo "Unable to find $BAU"
+                    return 1
+                fi
             fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU}"
@@ -165,7 +175,12 @@ wsub () {
                 FIX=$(basename $FIX)
                 ${RSYNC} $FIX ${DEST}/
             else            
-                FIX="${FIX}/results_${FIX}.gdx"
+                FIX="${FIX}/results_$(basename ${FIX}).gdx"
+                wssh test -f "$FIX"
+                if [ ! $? -eq 0 ]; then
+                    echo "Unable to find $FIX"
+                    return 1
+                fi
             fi
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
@@ -174,9 +189,9 @@ wsub () {
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     wup
     BSUB=bsub
-    [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I"
-    echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
+    echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
         wdown ${JOB_NAME}
