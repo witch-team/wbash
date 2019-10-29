@@ -41,6 +41,7 @@ wsub () {
     BSUB_INTERACTIVE=""
     CALIB=""
     DEBUG=""
+    VERBOSE=""
     RESDIR_CALIB=""
     USE_CALIB=""
     START=""
@@ -81,6 +82,10 @@ wsub () {
                 DEBUG=TRUE
                 shift
                 ;;            
+            -v|-verbose)
+                VERBOSE=TRUE
+                shift
+                ;;
             # CALIBRATION
             -c|-calib)
                 CALIB=TRUE
@@ -185,7 +190,8 @@ wsub () {
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
     fi
-    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_usa --parallel=false --holdfixed=0"
+    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_usa --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
+    [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     wup
     BSUB=bsub
