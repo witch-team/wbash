@@ -48,6 +48,7 @@ wsub () {
     BAU=""
     FIX=""
     DEST="${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
+    REG_SETUP="witch17"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -61,6 +62,11 @@ wsub () {
                 STARTBOOST=TRUE
                 shift
                 ;; 
+            -r|-regions)
+                REG_SETUP="$2"
+                shift
+                shift
+                ;;
             -b|--bau)
                 BAU="$2"
                 shift
@@ -171,7 +177,10 @@ wsub () {
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I"
     echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
-    [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
+    if [ -n "$BSUB_INTERACTIVE" ]; then
+        [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
+        wdown ${JOB_NAME}
+    fi
 }
 
 wdata () {
