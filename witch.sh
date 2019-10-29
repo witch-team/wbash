@@ -9,6 +9,12 @@ DEFAULT_QUEUE_SHORT=poe_short
 DEFAULT_NPROC=8
 WAIT=TRUE
 
+wsetup () {
+    [ -d ../witch-data ] && { cd ../witch-data; git pull; } || git clone git@github.com:witch-team/witch-data.git ../witch-data
+    [ -d ../witchtools ] && { cd ../witchtools; git pull; } || git clone git@github.com:witch-team/witchtools.git ../witchtools
+    R --vanilla -e 'install.packages("../witchtools", repos = NULL, type = "source")'
+}
+
 wdirname () {
     # Name of directory under DEFAULT_WORKDIR to use for upload
     BRANCH="$(git branch --show-current)"
