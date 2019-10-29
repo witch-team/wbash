@@ -152,7 +152,7 @@ wsub () {
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --startgdx=${START%.gdx}"
         [ -z "$BAU" ] && BAU="${START}"
-        [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START}"
+        [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START%.gdx}"
     fi
     if [ -n "$BAU" ]; then
         wssh test -f "$BAU"
@@ -170,7 +170,7 @@ wsub () {
                 fi
             fi
         fi
-        EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU}"
+        EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU%.gdx}"
     fi
     if [ -n "$FIX" ]; then
         wssh test -f "$FIX"
@@ -188,7 +188,7 @@ wsub () {
                 fi
             fi
         fi
-        EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX}"
+        EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
     fi
     [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_usa --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
