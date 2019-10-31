@@ -10,7 +10,7 @@ declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]
 declare -A DEFAULT_BSUB=( ["athena"]="bsub -sla SC_gams" ["zeus"]="bsub" ["local"]="local_bsub")
 declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake )
 declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh )
-declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="${DEFAULT_HOST}:" ["zeus"]="${DEFAULT_HOST}:" ["local"]="" )
+declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" )
 declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
 
 WAIT=TRUE
@@ -314,7 +314,7 @@ local_bsub () {
 }
 
 wssh () {
-   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && " "$@"
+   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && $@"
 }
 
 wcheck () {
