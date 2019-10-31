@@ -4,15 +4,27 @@ RSYNC='/usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git --r
 ERSYNC=
 DEFAULT_HOST=athena
 DEFAULT_WORKDIR=work
-DEFAULT_QUEUE=poe_medium
-DEFAULT_QUEUE_SHORT=poe_short
-DEFAULT_NPROC=8
+declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium )
+declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short )
+declare -A DEFAULT_BSUB=( ["athena"]="bsub -sla SC_gams" ["zeus"]="bsub" )
+declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 )
 WAIT=TRUE
+
+wdefault () {
+    echo DEFAULT_HOST=${DEFAULT_HOST}
+    echo DEFAULT_WORKDIR=${DEFAULT_WORKDIR}
+    echo DEFAULT_QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
+    echo DEFAULT_QUEUE_SHORT=${DEFAULT_QUEUE_SHORT[$DEFAULT_HOST]}
+    echo DEFAULT_NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
+}
 
 wsetup () {
     [ -d ../witch-data ] && { cd ../witch-data; git pull; } || git clone git@github.com:witch-team/witch-data.git ../witch-data
+    cd ../witch-data && git pull && wup && cd -
     [ -d ../witchtools ] && { cd ../witchtools; git pull; } || git clone git@github.com:witch-team/witchtools.git ../witchtools
-    R --vanilla -e 'install.packages("../witchtools", repos = NULL, type = "source")'
+    cd ../witchtools && git pull && wup && cd -    
+    wssh ${DEFAULT_BSUB[$DEFAULT_HOST]} -q ${DEFAULT_QUEUE[$DEFAULT_HOST]} -I -tty Rscript --vanilla tools/R/setup.R
+    Rscript --vanilla tools/R/setup.R
 }
 
 wdirname () {
@@ -41,8 +53,8 @@ wdown () {
 
 wsub () {
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE}
-    NPROC=${DEFAULT_NPROC}
+    QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
+    NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
     JOB_NAME=""
     BSUB_INTERACTIVE=""
     CALIB=""
@@ -200,19 +212,20 @@ wsub () {
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     wup
-    BSUB=bsub
-    [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
+    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
         wdown ${JOB_NAME}
+        notify-send "Done ${JOB_NAME}"
     fi
 }
 
 wdata () {
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE_SHORT}
+    QUEUE=${DEFAULT_QUEUE_SHORT[$DEFAULT_HOST]}
     BSUB_INTERACTIVE=""
     REG_SETUP="witch17"
     while [ $END_ARGS = FALSE ]; do
@@ -237,15 +250,18 @@ wdata () {
     wup
     cd ../witch-data && git pull && wup && cd -
     cd ../witchtools && git pull && wup && cd -
-    BSUB=bsub
-    [ -n "$BSUB_INTERACTIVE" ] && BSUB="bsub -I -tty"
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
-    [ -n "$BSUB_INTERACTIVE" ] && wdown ${JOB_NAME}
+    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
+    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    if [ -n "$BSUB_INTERACTIVE" ]; then
+        wdown ${JOB_NAME}
+        notify-send "Done ${JOB_NAME}"
+    fi
 }
 
 
 wssh () {
-   ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && $@"
+   ssh -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && " "$@"
 }
 
 wcheck () {
