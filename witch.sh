@@ -2,17 +2,22 @@
 
 RSYNC='/usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git --relative'
 ERSYNC=
+# Host supported: athena, zeus, local
 DEFAULT_HOST=athena
-DEFAULT_WORKDIR=work
-declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium )
-declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short )
-declare -A DEFAULT_BSUB=( ["athena"]="bsub -sla SC_gams" ["zeus"]="bsub" )
-declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 )
+declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
+declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium ["local"]=fake)
+declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
+declare -A DEFAULT_BSUB=( ["athena"]="bsub -sla SC_gams" ["zeus"]="bsub" ["local"]="local_bsub")
+declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake )
+declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh )
+declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="${DEFAULT_HOST}:" ["zeus"]="${DEFAULT_HOST}:" ["local"]="" )
+declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
+
 WAIT=TRUE
 
 wdefault () {
     echo DEFAULT_HOST=${DEFAULT_HOST}
-    echo DEFAULT_WORKDIR=${DEFAULT_WORKDIR}
+    echo DEFAULT_WORKDIR=${DEFAULT_WORKDIR[$DEFAULT_HOST]}
     echo DEFAULT_QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
     echo DEFAULT_QUEUE_SHORT=${DEFAULT_QUEUE_SHORT[$DEFAULT_HOST]}
     echo DEFAULT_NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
@@ -32,23 +37,27 @@ wdirname () {
     BRANCH="$(git branch --show-current)"
     PWD="$(basename $(pwd))"
     DESTDIR=""
-    [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
-    DESTDIR=${DESTDIR%-master}
+    if [ -n "${DEFAULT_WDIR_SAME[$DEFAULT_HOST]}" ]; then
+        DESTDIR="${PWD}"
+    else
+        [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
+        DESTDIR=${DESTDIR%-master}
+    fi
     echo "${DESTDIR}"
 }
 
 
 wup () {
-    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname), excluding non-git files" && return 1
+    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname), excluding non-git files" && return 1
     TMPDIR="$(mktemp -d)"
-    ERSYNC="${RSYNC} --exclude-from=$(git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes; echo ${TMPDIR}/excludes) ${@} ./ ${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
+    ERSYNC="${RSYNC} --exclude-from=$(git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes; echo ${TMPDIR}/excludes) ${@} ./ ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
     echo "${ERSYNC}"
     ${ERSYNC}
     rm -r "${TMPDIR}"
 }
 
 wdown () {
-    ${RSYNC} "${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)/./$1" .
+    ${RSYNC} "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
 }
 
 wsub () {
@@ -66,7 +75,7 @@ wsub () {
     STARTBOOST=""
     BAU=""
     FIX=""
-    DEST="${DEFAULT_HOST}:${DEFAULT_WORKDIR}/$(wdirname)"
+    DEST="${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
     REG_SETUP="witch17"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
@@ -214,8 +223,8 @@ wsub () {
     wup
     BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    echo ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
+    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
+    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} --n=${REG_SETUP} ${EXTRA_ARGS} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
         wdown ${JOB_NAME}
@@ -252,7 +261,7 @@ wdata () {
     cd ../witchtools && git pull && wup && cd -
     BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
         notify-send "Done ${JOB_NAME}"
@@ -260,8 +269,52 @@ wdata () {
 }
 
 
+local_bsub () {
+    END_ARGS=FALSE
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            # BSUB
+            -R)
+                shift
+                shift
+                ;;
+            -n)
+                shift
+                shift
+                ;;
+            -o)
+                shift
+                shift
+                ;;
+            -e)
+                shift
+                shift
+                ;;
+            -q)
+                shift
+                shift
+                ;;
+            -J)
+                shift
+                shift
+                ;;
+            -I)
+                shift
+                ;;
+            -tty)
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    eval "$@"
+}
+
 wssh () {
-   ssh -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && " "$@"
+   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && " "$@"
 }
 
 wcheck () {
@@ -269,7 +322,7 @@ wcheck () {
     if [ -z "$JOB_NAME" ]; then
         ssh ${DEFAULT_HOST} bjobs -w
     else
-        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && bpeek -f -J ${JOB_NAME}"
+        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && bpeek -f -J ${JOB_NAME}"
     fi
 }
 
@@ -278,7 +331,7 @@ werr () {
     if [ -z "$JOB_NAME" ]; then
         ssh ${DEFAULT_HOST} bjobs -w
     else
-        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR}/$(wdirname) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt"
+        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt"
     fi
 }
 
@@ -481,6 +534,23 @@ gdiff ()
     $CMD -c -L -d' ,.' ${DMPLIST[@]}
 }
 
+local_ssh () {
+    END_ARGS=FALSE
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -T)
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    shift
+    eval "$@"
+}
+
 alias bw='bjobs -w'
 
 alias bwg='bjobs -w | egrep -i'
@@ -506,3 +576,4 @@ alias bkj='bkill -J'
 alias lsl='ls -lcth | head -n20'
 
 alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
+
