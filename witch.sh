@@ -13,7 +13,7 @@ declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh )
 declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" )
 declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
 
-WAIT=TRUE
+WAIT=T
 
 wdefault () {
     echo DEFAULT_HOST=${DEFAULT_HOST}
@@ -24,12 +24,16 @@ wdefault () {
 }
 
 wsetup () {
-    [ -d ../witch-data ] && { cd ../witch-data; git pull; } || git clone git@github.com:witch-team/witch-data.git ../witch-data
-    cd ../witch-data && git pull && wup && cd -
-    [ -d ../witchtools ] && { cd ../witchtools; git pull; } || git clone git@github.com:witch-team/witchtools.git ../witchtools
-    cd ../witchtools && git pull && wup && cd -    
-    wssh ${DEFAULT_BSUB[$DEFAULT_HOST]} -q ${DEFAULT_QUEUE[$DEFAULT_HOST]} -I -tty Rscript --vanilla tools/R/setup.R
-    Rscript --vanilla tools/R/setup.R
+    [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
+    cd ../witch-data && git pull
+    [ "$DEFAULT_HOST" = local ] || wup
+    cd -
+    [ -d ../witchtools ] || git clone git@github.com:witch-team/witchtools.git ../witchtools
+    cd ../witchtools && git pull
+    [ "$DEFAULT_HOST" = local ] || wup
+    cd -    
+    [ "$DEFAULT_HOST" = local ] || wup
+    [ "$DEFAULT_HOST" = local ] && Rscript --vanilla tools/R/setup.R || wssh ${DEFAULT_BSUB[$DEFAULT_HOST]} -q ${DEFAULT_QUEUE[$DEFAULT_HOST]} -I -tty Rscript --vanilla tools/R/setup.R
 }
 
 wdirname () {
