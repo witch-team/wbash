@@ -81,6 +81,7 @@ wsub () {
     FIX=""
     DEST="${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
     REG_SETUP="witch17"
+    EXTRA_ARGS=""
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
