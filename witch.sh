@@ -61,7 +61,23 @@ wup () {
 }
 
 wdown () {
-    ${RSYNC} "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
+    END_ARGS=FALSE
+    EXCLUDE_ALLDATATEMP="TRUE"
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -a|-alldata)
+                EXCLUDE_ALLDATATEMP=""
+                shift
+                ;;   
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    RSYNC_ARGS=()
+    [ -n "$EXCLUDE_ALLDATATEMP" ] && RSYNC_ARGS=(--exclude '*/all_data_*.gdx')
+    ${RSYNC} "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
 }
 
 wsub () {
