@@ -1,4 +1,27 @@
 
+* TOC                                                                   :TOC_5_gh:
+- [[#installation][Installation]]
+- [[#usage][Usage]]
+  - [[#setup][Setup]]
+    - [[#select-a-host-to-run-the-code][Select a host to run the code]]
+    - [[#prepare-to-run-witch-for-the-first-time][Prepare to run WITCH for the first time]]
+  - [[#witch][WITCH]]
+    - [[#generate-data-folder][Generate data folder]]
+    - [[#calibrate][Calibrate]]
+    - [[#run-witch-non-interactively][Run witch non-interactively]]
+    - [[#check-non-interactive-witch-runs][Check non-interactive WITCH runs]]
+    - [[#run-with-starting-point][Run with starting point]]
+    - [[#run-with-double-dash-parameters][Run with double-dash parameters]]
+    - [[#calibrate-in-a-local-folder][Calibrate in a local folder]]
+  - [[#sync][Sync]]
+    - [[#download-a-remote-folder][Download a remote folder]]
+    - [[#upload-a-local-folder][Upload a local folder]]
+  - [[#post-process][Post-process]]
+    - [[#show-double-dash-parameters-of-a-past-run][Show double-dash parameters of a past run]]
+    - [[#run-database-on-a-past-run-results][Run database on a past run results]]
+  - [[#misc][Misc]]
+    - [[#run-a-command-via-ssh][Run a command via ssh]]
+
 * Installation
 All commands below are to be run on your local computer. If you use Windows, make sure you work in a BASH shell prompt, e.g. via the [[https://docs.microsoft.com/en-us/windows/wsl/install-win10][Windows Subsystem for Linux]].
 
@@ -32,7 +55,10 @@ All commands below are to be run on your local computer. If you use Windows, mak
 
 
 * Usage
-** Select a host to run the code
+
+** Setup
+
+*** Select a host to run the code
 #+begin_src sh
 export WHOST=zeus
 export WHOST=athena
@@ -54,7 +80,7 @@ as follows:
 |             | witch        | BRANCH!=master | WHOST:~/work/witch-BRANCH |
 
 
-** Prepare to run WITCH for the first time
+*** Prepare to run WITCH for the first time
 #+begin_src sh
 git clone git@github.com:witch-team/witch.git
 cd witch
@@ -66,7 +92,9 @@ This will:
 - pull current dir, then sync it to WHOST
 - run =tools/R/setup.R= on WHOST, which will install basic R dependencies
 
-** Generate data folder
+** WITCH
+
+*** Generate data folder
 To generate =data_witch17=:
 #+begin_src sh
 wdata -i
@@ -77,7 +105,7 @@ This will:
 - download the resulting =data_witch17= folder (needs to be done manually if non-interactive).
 Use =-r xxx= to use regional setup =xxx=.
 
-** Calibrate
+*** Calibrate
 #+begin_src sh
   wsub -j calib -i -c
 #+end_src
@@ -96,27 +124,10 @@ This will:
 
 File names follow the job name (i.e. the one specified after =-j=).
 
-** Download a remote folder
-To download the remote folder =xxx= from the remost working dir, use:
-#+begin_src sh
-wdown xxx
-#+end_src
-Use =wdown -a xxx= to download also the =all_data_temp*.gdx=.
-
-** Upload a local folder
-To upload the local folder =yyy=, use:
-#+begin_src sh
-wup yyy
-#+end_src
-By default:
-- w/o arguments the current dir is uploaded;
-- only versioned files are uploaded; to include non-git files, use =-a= before =yyy=;
-- target folder name on WHOST is the same, to use a different name, e.g. =zzz=, use =-t zzz= before =yyy=.
-
-** Run witch non-interactively
+*** Run witch non-interactively
 Drop the =-i= after =wsub= (this won't affect local runs).
 
-** Check non-interactive WITCH runs 
+*** Check non-interactive WITCH runs 
 To list all running jobs:
 #+begin_src sh
 wcheck
@@ -132,7 +143,7 @@ To check the =errors_*.txt= file of job =bau=:
 werr bau
 #+end_src
 
-** Run with starting point
+*** Run with starting point
 To run a bau using =calib/results_calib.gdx= as starting gdx:
 #+begin_src sh
 wsub -j bau -s calib
@@ -143,13 +154,13 @@ Notice that it's enough to specify =calib=. This will be translated into =calib/
 
 Add =-S= for =startboost=.
 
-** Run with double-dash parameters
+*** Run with double-dash parameters
 To pass double-dash parameters to gams, just specify them at the end:
 #+begin_src sh
 wsub -j wb600 --policy=innopaths --scen=wb600
 #+end_src
 
-** Calibrate in a local folder
+*** Calibrate in a local folder
 #+begin_src sh
 wsub -j calib_xxx -C
 #+end_src
@@ -159,20 +170,43 @@ wsub -j bau_xxx -i -u calib_xxx
 #+end_src
 This will also set start and bau gdx to =calib_xxx/results_calib_xxx=.
 
-** Show double-dash parameters of a past run
+** Sync
+
+*** Download a remote folder
+To download the remote folder =xxx= from the remost working dir, use:
+#+begin_src sh
+wdown xxx
+#+end_src
+Use =wdown -a xxx= to download also the =all_data_temp*.gdx=.
+
+*** Upload a local folder
+To upload the local folder =yyy=, use:
+#+begin_src sh
+wup yyy
+#+end_src
+By default:
+- w/o arguments the current dir is uploaded;
+- only versioned files are uploaded; to include non-git files, use =-a= before =yyy=;
+- target folder name on WHOST is the same, to use a different name, e.g. =zzz=, use =-t zzz= before =yyy=.
+
+** Post-process
+
+*** Show double-dash parameters of a past run
 If the run was named =bau=, use:
 #+begin_src sh
 wshow bau
 #+end_src
 
-** Run database on a past run results
+*** Run database on a past run results
 If the run was named =ctax=, use:
 #+begin_src sh
 wdb ctax
 #+end_src
 After running the command above, the =ctax/= local folder will be updated with the generated db files. Use =-o= switch to specify a gdx out db name, and =-b= to specify a bau gdx different than =bau/results_bau=.
 
-** Run a command via ssh
+** Misc
+
+*** Run a command via ssh
 To run a command, e.g. =ls -clt=, in WHOST working dir, use:
 #+begin_src sh
 wssh ls -clt
