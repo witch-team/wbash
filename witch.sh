@@ -1,8 +1,7 @@
 #!/bin/bash
 
-
 # Host supported: athena, zeus, local
-DEFAULT_HOST=zeus
+WHOST=zeus
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
 declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium ["local"]=fake)
 declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
@@ -16,7 +15,7 @@ WAIT=T
 
 wshow () {
     SCEN="$1"
-    ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && sed -n 's/[*]/ /;s/ \+/ /g;/^Level SetVal/,/macro definitions/p;/macro definitions/q' ${SCEN}/${SCEN}.lst | cut -f 3,5 -d ' ' | sort -u -t\  -k1,1 | column -t -s' '" | perl -pe '$_ = "\e[92m$_\e[0m" if($. % 2)'
+    ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && sed -n 's/[*]/ /;s/ \+/ /g;/^Level SetVal/,/macro definitions/p;/macro definitions/q' ${SCEN}/${SCEN}.lst | cut -f 3,5 -d ' ' | sort -u -t\  -k1,1 | column -t -s' '" | perl -pe '$_ = "\e[92m$_\e[0m" if($. % 2)'
 }
 
 wrsync () {
@@ -42,28 +41,28 @@ wrsync () {
 }
 
 wdefault () {
-    echo DEFAULT_HOST=${DEFAULT_HOST}
-    echo DEFAULT_WORKDIR=${DEFAULT_WORKDIR[$DEFAULT_HOST]}
-    echo DEFAULT_QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
-    echo DEFAULT_QUEUE_SHORT=${DEFAULT_QUEUE_SHORT[$DEFAULT_HOST]}
-    echo DEFAULT_NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
+    echo WHOST=${WHOST}
+    echo DEFAULT_WORKDIR=${DEFAULT_WORKDIR[$WHOST]}
+    echo DEFAULT_QUEUE=${DEFAULT_QUEUE[$WHOST]}
+    echo DEFAULT_QUEUE_SHORT=${DEFAULT_QUEUE_SHORT[$WHOST]}
+    echo DEFAULT_NPROC=${DEFAULT_NPROC[$WHOST]}
 }
 
 wsync () {
     [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
     cd ../witch-data && git pull
-    [ "$DEFAULT_HOST" = local ] || wup -t witch-data
+    [ "$WHOST" = local ] || wup -t witch-data
     cd -
     [ -d ../witchtools ] || git clone git@github.com:witch-team/witchtools.git ../witchtools
     cd ../witchtools && git pull
-    [ "$DEFAULT_HOST" = local ] || wup -t witchtools
+    [ "$WHOST" = local ] || wup -t witchtools
     cd -    
-    [ "$DEFAULT_HOST" = local ] || wup
+    [ "$WHOST" = local ] || wup
 }
 
 wsetup () {
     wsync
-    [ "$DEFAULT_HOST" = local ] && Rscript --vanilla tools/R/setup.R || wssh ${DEFAULT_BSUB[$DEFAULT_HOST]} -q ${DEFAULT_QUEUE[$DEFAULT_HOST]} -I -tty Rscript --vanilla tools/R/setup.R
+    [ "$WHOST" = local ] && Rscript --vanilla tools/R/setup.R || wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla tools/R/setup.R
 }
 
 wdirname () {
@@ -71,7 +70,7 @@ wdirname () {
     BRANCH="$(git branch --show-current)"
     PWD="$(basename $(pwd))"
     DESTDIR=""
-    if [ -n "${DEFAULT_WDIR_SAME[$DEFAULT_HOST]}" ]; then
+    if [ -n "${DEFAULT_WDIR_SAME[$WHOST]}" ]; then
         DESTDIR="${PWD}"
     else
         [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
@@ -115,8 +114,8 @@ wup () {
         git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes
         RSYNC_ARGS=( --exclude-from=$(echo ${TMPDIR}/excludes) )
     fi
-    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/${WTARGET}, excluding non-git files" && return 1
-    wrsync "${RSYNC_ARGS[@]}" ${@} ${MAYBE_SOURCE[@]} ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/${WTARGET}
+    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}, excluding non-git files" && return 1
+    wrsync "${RSYNC_ARGS[@]}" ${@} ${MAYBE_SOURCE[@]} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
     [ -n "$ONLY_GIT" ] && rm -r "${TMPDIR}"
 }
 
@@ -137,13 +136,13 @@ wdown () {
     done
     RSYNC_ARGS=()
     [ -n "$EXCLUDE_ALLDATATEMP" ] && RSYNC_ARGS=(--exclude '*/all_data_*.gdx')
-    wrsync "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
+    wrsync "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/./$1" .
 }
 
 wsub () {
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
-    NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
+    QUEUE=${DEFAULT_QUEUE[$WHOST]}
+    NPROC=${DEFAULT_NPROC[$WHOST]}
     JOB_NAME=""
     BSUB_INTERACTIVE=""
     CALIB=""
@@ -155,7 +154,7 @@ wsub () {
     STARTBOOST=""
     BAU=""
     FIX=""
-    DEST="${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
+    DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     REG_SETUP=""
     DRY_RUN=""
     EXTRA_ARGS=""
@@ -308,11 +307,11 @@ wsub () {
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
     wup
-    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
+    BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     if [ -z "${DRY_RUN}" ]; then
-        ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
         if [ -n "$BSUB_INTERACTIVE" ]; then
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
             wdown ${JOB_NAME}
@@ -323,19 +322,25 @@ wsub () {
 
 wdb () {
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
-    NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
+    QUEUE=${DEFAULT_QUEUE[$WHOST]}
+    NPROC=${DEFAULT_NPROC[$WHOST]}
     JOB_NAME=""
-    DEST="${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
+    DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     DRY_RUN=""
     DB_OUT=""
     EXTRA_ARGS=""
+    GDXBAU="bau/results_bau"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
             # WITCH
             -o|-dbout)
                 DB_OUT="$2"
+                shift
+                shift
+                ;;   
+            -b|-baugdx)
+                GDXBAU="$2"
                 shift
                 shift
                 ;;   
@@ -346,13 +351,12 @@ wdb () {
     done
     SCEN="$1"
     shift
-    GDXBAU="bau/results_bau"
     PROCDIR="225_db_${SCEN}"
     [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}.gdx"
-    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]} -I -tty"
+    BSUB="${DEFAULT_BSUB[$WHOST]} -I -tty"
     wup
-    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
      wdown "${SCEN}/db*gdx"
      notify-send "Done db_${SCEN}"
 }
@@ -360,7 +364,7 @@ wdb () {
 
 wdata () {
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE_SHORT[$DEFAULT_HOST]}
+    QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
     BSUB_INTERACTIVE=""
     REG_SETUP="witch17"
     while [ $END_ARGS = FALSE ]; do
@@ -383,9 +387,9 @@ wdata () {
     done
     JOB_NAME="data_${REG_SETUP}"
     wsync
-    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
+    BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
         notify-send "Done ${JOB_NAME}"
@@ -438,28 +442,28 @@ local_bsub () {
 }
 
 wssh () {
-   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && $@"
+   ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && $@"
 }
 
 wsshq () {
-   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && \"${@}\""
+   ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && \"${@}\""
 }
 
 wcheck () {
     JOB_NAME="$1"
     if [ -z "$JOB_NAME" ]; then
-        ssh ${DEFAULT_HOST} bjobs -w
+        ssh ${WHOST} bjobs -w
     else
-        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && bpeek -f -J ${JOB_NAME}"
+        ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && bpeek -f -J ${JOB_NAME}"
     fi
 }
 
 werr () {
     JOB_NAME="$1"
     if [ -z "$JOB_NAME" ]; then
-        ssh ${DEFAULT_HOST} bjobs -w
+        ssh ${WHOST} bjobs -w
     else
-        ssh ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt"
+        ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt"
     fi
 }
 
@@ -494,214 +498,214 @@ werr () {
 
 
 
-wdump ()
-{
-WHAT=$1
-shift
-while [ "$1" != "" ]; do
-    for f in ${1}/all_data_temp*gdx; do
-        echo -e "\n\e[33m${f}:\e[0m" 1>&2 
-        gdxdump $f symb=${WHAT}
-    done
-    shift
-done
-}
+# wdump ()
+# {
+# WHAT=$1
+# shift
+# while [ "$1" != "" ]; do
+#     for f in ${1}/all_data_temp*gdx; do
+#         echo -e "\n\e[33m${f}:\e[0m" 1>&2 
+#         gdxdump $f symb=${WHAT}
+#     done
+#     shift
+# done
+# }
 
-wtemp ()
-{
-workdir="$1"
-ngdx="$2"
-match="$3"
-for f in ${workdir}/all_data_temp_${match}*; do
-fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
-until rsync ${f} ${fname}_1.gdx; do sleep 1; done
-ahash=$(md5sum ${fname}_1.gdx | cut -d' ' -f1)
-echo "${f} -> ${fname}_1.gdx (${ahash})"
-tail -n1 ${workdir}/errors_${match}*
-bhash=$ahash
-for i in $(seq 2 $ngdx); do
-while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
-until rsync ${f} ${fname}_${i}.gdx; do sleep 1; done
-echo "${f} -> ${fname}_${i}.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*
-ahash="${bhash}"
-done
-done
-}
+# wtemp ()
+# {
+# workdir="$1"
+# ngdx="$2"
+# match="$3"
+# for f in ${workdir}/all_data_temp_${match}*; do
+# fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
+# until rsync ${f} ${fname}_1.gdx; do sleep 1; done
+# ahash=$(md5sum ${fname}_1.gdx | cut -d' ' -f1)
+# echo "${f} -> ${fname}_1.gdx (${ahash})"
+# tail -n1 ${workdir}/errors_${match}*
+# bhash=$ahash
+# for i in $(seq 2 $ngdx); do
+# while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
+# until rsync ${f} ${fname}_${i}.gdx; do sleep 1; done
+# echo "${f} -> ${fname}_${i}.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*
+# ahash="${bhash}"
+# done
+# done
+# }
 
-wclean ()
-{
-rm -rv 225*
-rm -v */*{lst,out,err}
-}
+# wclean ()
+# {
+# rm -rv 225*
+# rm -v */*{lst,out,err}
+# }
 
-wcleandir ()
-{
-SCENDIR=$1
-PROCDIR=225_${SCENDIR}
-if [ -d ${PROCDIR} ]; then
-rm -rf ${PROCDIR}/*
-else
-mkdir -p ${PROCDIR}
-fi
-if [ -d ${SCENDIR} ]; then
-rm ${SCENDIR}/{*lst,job*{out,err}}
-else
-mkdir -p ${SCENDIR}
-fi
-}
+# wcleandir ()
+# {
+# SCENDIR=$1
+# PROCDIR=225_${SCENDIR}
+# if [ -d ${PROCDIR} ]; then
+# rm -rf ${PROCDIR}/*
+# else
+# mkdir -p ${PROCDIR}
+# fi
+# if [ -d ${SCENDIR} ]; then
+# rm ${SCENDIR}/{*lst,job*{out,err}}
+# else
+# mkdir -p ${SCENDIR}
+# fi
+# }
 
-wrun_general ()
-{
-QUEUE=$1
-RUN=$2
-NPROC=$3
-wcleandir ${RUN}
-mkdir -p ${RUN} 225_${RUN}
-EXTRA_ARGS=""
-PREV_CONV="$(gdxdump ${RUN}/results_${RUN}.gdx symb=stop_nash format=csv | tail -n1 | sed 's/[[:space:]]//g')"
-if [[ $PREV_CONV =~ ^1$ ]]; then
-[[ ! ${@:4} =~ startgdx ]] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
-[[ ! ${@:4} =~ startgdx ]] && [[ ! ${@:4} =~ gdxfix ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
-[[ ! ${@:4} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
-fi
-[ -z "$EXTRA_ARGS" ] || echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
-bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms pw=32767 gdxcompress=1 Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 --parallel=incore ${EXTRA_ARGS} ${@:4}
-}
+# wrun_general ()
+# {
+# QUEUE=$1
+# RUN=$2
+# NPROC=$3
+# wcleandir ${RUN}
+# mkdir -p ${RUN} 225_${RUN}
+# EXTRA_ARGS=""
+# PREV_CONV="$(gdxdump ${RUN}/results_${RUN}.gdx symb=stop_nash format=csv | tail -n1 | sed 's/[[:space:]]//g')"
+# if [[ $PREV_CONV =~ ^1$ ]]; then
+# [[ ! ${@:4} =~ startgdx ]] && EXTRA_ARGS="$EXTRA_ARGS --startgdx=${RUN}/results_${RUN} --calibgdx=${RUN}/results_${RUN} --tfpgdx=${RUN}/results_${RUN}"
+# [[ ! ${@:4} =~ startgdx ]] && [[ ! ${@:4} =~ gdxfix ]] && EXTRA_ARGS="$EXTRA_ARGS --startboost=1"
+# [[ ! ${@:4} =~ baugdx ]] && [[ ${RUN} =~ bau ]] && EXTRA_ARGS="$EXTRA_ARGS --baugdx=${RUN}/results_${RUN}"
+# fi
+# [ -z "$EXTRA_ARGS" ] || echo "AUTO EXTRA ARGS: $EXTRA_ARGS"
+# bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q ${QUEUE} -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms pw=32767 gdxcompress=1 Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --resdir=$RUN/ --gdxout=results_${RUN} --gdxout_report=report_${RUN} --gdxout_start=start_${RUN} --verbose=1 --parallel=incore ${EXTRA_ARGS} ${@:4}
+# }
 
 
-wrun6 ()
-{
-RUN=$1
-NPROC=$2
-wrun_general serial_6h ${RUN} ${NPROC} ${@:3}
-}
+# wrun6 ()
+# {
+# RUN=$1
+# NPROC=$2
+# wrun_general serial_6h ${RUN} ${NPROC} ${@:3}
+# }
 
-wbrun ()
-{
-RUN=$1
-NPROC=$2
-BASEGDX=$3
-wrun ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
-}      
+# wbrun ()
+# {
+# RUN=$1
+# NPROC=$2
+# BASEGDX=$3
+# wrun ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
+# }      
 
-wbrun6 ()
-{
-RUN=$1
-NPROC=$2
-BASEGDX=$3
-wrun6 ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
-}      
+# wbrun6 ()
+# {
+# RUN=$1
+# NPROC=$2
+# BASEGDX=$3
+# wrun6 ${RUN} ${NPROC} --startgdx=${BASEGDX} --baugdx=${BASEGDX} --calibgdx=${BASEGDX} --tfpgdx=${BASEGDX} --startboost=1 ${@:4}
+# }      
 
-wcrun ()
-{
-RUN=$1
-NPROC=$2
-BASEGDX=$3
-wbrun ${RUN} ${NPROC} ${BASEGDX} --calibration=1 ${@:4}
-}      
+# wcrun ()
+# {
+# RUN=$1
+# NPROC=$2
+# BASEGDX=$3
+# wbrun ${RUN} ${NPROC} ${BASEGDX} --calibration=1 ${@:4}
+# }      
 
-wfrun ()
-{
-RUN=$1
-NPROC=$2
-BASEGDX=$3
-wbrun ${RUN} ${NPROC} ${BASEGDX} --gdxfix=${BASEGDX} ${@:4}
-}      
+# wfrun ()
+# {
+# RUN=$1
+# NPROC=$2
+# BASEGDX=$3
+# wbrun ${RUN} ${NPROC} ${BASEGDX} --gdxfix=${BASEGDX} ${@:4}
+# }      
 
-wtax ()
-{
-RUN=$1
-NPROC=$2
-BASEGDX=$3
-TAXSTARTPERIOD=$4
-TAXSTARTVAL=$5
-TAXGROWTHRATE=$6
-TFIX=$(expr ${TAXSTARTPERIOD} - 1)
-echo "Carbon tax starting in period ${TAXSTARTPERIOD} at ${TAXSTARTVAL} USD2005/tCO2 and growing at ${TAXGROWTHRATE} rate"
-wfrun ${RUN} ${NPROC} ${BASEGDX} --tfix=${TFIX} --policy=ctax --tax_start=${TAXSTARTPERIOD} --ctax2015=${TAXSTARTVAL} --ctaxgrowth=${TAXGROWTHRATE} ${@:7}
-}      
+# wtax ()
+# {
+# RUN=$1
+# NPROC=$2
+# BASEGDX=$3
+# TAXSTARTPERIOD=$4
+# TAXSTARTVAL=$5
+# TAXGROWTHRATE=$6
+# TFIX=$(expr ${TAXSTARTPERIOD} - 1)
+# echo "Carbon tax starting in period ${TAXSTARTPERIOD} at ${TAXSTARTVAL} USD2005/tCO2 and growing at ${TAXGROWTHRATE} rate"
+# wfrun ${RUN} ${NPROC} ${BASEGDX} --tfix=${TFIX} --policy=ctax --tax_start=${TAXSTARTPERIOD} --ctax2015=${TAXSTARTVAL} --ctaxgrowth=${TAXGROWTHRATE} ${@:7}
+# }      
 
-wfind ()
-{
-grep -i "$1" *.gms */*.gms
-}
+# wfind ()
+# {
+# grep -i "$1" *.gms */*.gms
+# }
 
-gdiff ()
-{
-    type dwdiff &>nul 2>&1;
-    if [ $? -eq 0 ]; then
-        CMD=dwdiff;
-    else
-        if [ ! -f dwdiff ]; then
-            echo 'WARN: dwdiff tool not found... downloading'
-            curl http://os.ghalkes.nl/dist/dwdiff-2.1.0.tar.bz2 > dwdiff-2.1.0.tar.bz2
-            tar xjf dwdiff-2.1.0.tar.bz2 
-            cd dwdiff-2.1.0
-            ./configure
-            make all
-            mv dwdiff ../
-            cd ..
-            rm -rf dwdiff-2.1.0.tar.bz2 dwdiff-2.1.0
-            CMD=./dwdiff;
-        fi
-    fi;
-    SYMB=$1;
-    MATCHES=$2
-    DMPLIST=(one two);
-    IGDX=0;
-    AWKPARAM="/\"$(sed 's|,|[a-z]*"/ \&\& /"|g' <<<"${MATCHES}")[a-z]*\"/"
-    for GDX in ${@:3};
-    do
-        echo $GDX;
-        DMP=${GDX%.gdx}zzz.txt;
-        rm -fv "$DMP"
-        gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
-        DMPLIST[IGDX]=$DMP;
-        let IGDX=IGDX+1;
-    done;
-    $CMD -c -L -d' ,.' ${DMPLIST[@]}
-}
+# gdiff ()
+# {
+#     type dwdiff &>nul 2>&1;
+#     if [ $? -eq 0 ]; then
+#         CMD=dwdiff;
+#     else
+#         if [ ! -f dwdiff ]; then
+#             echo 'WARN: dwdiff tool not found... downloading'
+#             curl http://os.ghalkes.nl/dist/dwdiff-2.1.0.tar.bz2 > dwdiff-2.1.0.tar.bz2
+#             tar xjf dwdiff-2.1.0.tar.bz2 
+#             cd dwdiff-2.1.0
+#             ./configure
+#             make all
+#             mv dwdiff ../
+#             cd ..
+#             rm -rf dwdiff-2.1.0.tar.bz2 dwdiff-2.1.0
+#             CMD=./dwdiff;
+#         fi
+#     fi;
+#     SYMB=$1;
+#     MATCHES=$2
+#     DMPLIST=(one two);
+#     IGDX=0;
+#     AWKPARAM="/\"$(sed 's|,|[a-z]*"/ \&\& /"|g' <<<"${MATCHES}")[a-z]*\"/"
+#     for GDX in ${@:3};
+#     do
+#         echo $GDX;
+#         DMP=${GDX%.gdx}zzz.txt;
+#         rm -fv "$DMP"
+#         gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
+#         DMPLIST[IGDX]=$DMP;
+#         let IGDX=IGDX+1;
+#     done;
+#     $CMD -c -L -d' ,.' ${DMPLIST[@]}
+# }
 
-local_ssh () {
-    END_ARGS=FALSE
-    while [ $END_ARGS = FALSE ]; do
-        key="$1"
-        case $key in
-            -T)
-                shift
-                ;;
-            *)
-                END_ARGS=TRUE
-                ;;
-        esac
-    done
-    shift
-    eval "$@"
-}
+# local_ssh () {
+#     END_ARGS=FALSE
+#     while [ $END_ARGS = FALSE ]; do
+#         key="$1"
+#         case $key in
+#             -T)
+#                 shift
+#                 ;;
+#             *)
+#                 END_ARGS=TRUE
+#                 ;;
+#         esac
+#     done
+#     shift
+#     eval "$@"
+# }
 
-alias bw='bjobs -w'
+# alias bw='bjobs -w'
 
-alias bwg='bjobs -w | egrep -i'
+# alias bwg='bjobs -w | egrep -i'
 
-alias bag='bjobs -aw | grep -i'
+# alias bag='bjobs -aw | grep -i'
 
-alias bal='bjobs -aw | tail'
+# alias bal='bjobs -aw | tail'
 
-alias bl='bjobs -l'
+# alias bl='bjobs -l'
 
-alias blj='bjobs -l -J'
+# alias blj='bjobs -l -J'
 
-alias bf='bpeek -f'
+# alias bf='bpeek -f'
 
-alias bfj='bpeek -f -J'
+# alias bfj='bpeek -f -J'
 
-alias bq='bqueues | egrep "(QUEUE_NAME|serial|gams)"'
+# alias bq='bqueues | egrep "(QUEUE_NAME|serial|gams)"'
 
-alias bk='bkill'
+# alias bk='bkill'
 
-alias bkj='bkill -J'
+# alias bkj='bkill -J'
 
-alias lsl='ls -lcth | head -n20'
+# alias lsl='ls -lcth | head -n20'
 
-alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
+# alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
 
