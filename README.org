@@ -1,5 +1,6 @@
+
 * Installation
-All commands below are to be run on your local computer.
+All commands below are to be run on your local computer. If you use Windows, make sure you work in a BASH shell prompt, e.g. via the [[https://docs.microsoft.com/en-us/windows/wsl/install-win10][Windows Subsystem for Linux]].
 
 1. Clone this repo, e.g. in =~/dotfiles/wbash=
    #+begin_src sh
