@@ -1,19 +1,45 @@
 #!/bin/bash
 
-RSYNC='/usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git --relative'
-ERSYNC=
+
 # Host supported: athena, zeus, local
-DEFAULT_HOST=athena
+DEFAULT_HOST=zeus
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
 declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium ["local"]=fake)
 declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
-declare -A DEFAULT_BSUB=( ["athena"]="bsub -sla SC_gams" ["zeus"]="bsub" ["local"]="local_bsub")
+declare -A DEFAULT_BSUB=( ["athena"]="bsub -R span[hosts=1] -sla SC_gams" ["zeus"]="bsub -R span[hosts=1]" ["local"]="local_bsub")
 declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake )
 declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh )
 declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" )
 declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
 
 WAIT=T
+
+wshow () {
+    SCEN="$1"
+    ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && sed -n 's/[*]/ /;s/ \+/ /g;/^Level SetVal/,/macro definitions/p;/macro definitions/q' ${SCEN}/${SCEN}.lst | cut -f 3,5 -d ' ' | sort -u -t\  -k1,1 | column -t -s' '" | perl -pe '$_ = "\e[92m$_\e[0m" if($. % 2)'
+}
+
+wrsync () {
+    END_ARGS=FALSE
+    RELATIVE="TRUE"
+    WTARGET="$(wdirname)"
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -a|-absolute)
+                RELATIVE=""
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    RSYNC_ARGS=()
+    [ -n "$RELATIVE" ] && RSYNC_ARGS=( --relative )
+    echo /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+    /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+}
 
 wdefault () {
     echo DEFAULT_HOST=${DEFAULT_HOST}
@@ -23,16 +49,20 @@ wdefault () {
     echo DEFAULT_NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
 }
 
-wsetup () {
+wsync () {
     [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
     cd ../witch-data && git pull
-    [ "$DEFAULT_HOST" = local ] || wup
+    [ "$DEFAULT_HOST" = local ] || wup -t witch-data
     cd -
     [ -d ../witchtools ] || git clone git@github.com:witch-team/witchtools.git ../witchtools
     cd ../witchtools && git pull
-    [ "$DEFAULT_HOST" = local ] || wup
+    [ "$DEFAULT_HOST" = local ] || wup -t witchtools
     cd -    
     [ "$DEFAULT_HOST" = local ] || wup
+}
+
+wsetup () {
+    wsync
     [ "$DEFAULT_HOST" = local ] && Rscript --vanilla tools/R/setup.R || wssh ${DEFAULT_BSUB[$DEFAULT_HOST]} -q ${DEFAULT_QUEUE[$DEFAULT_HOST]} -I -tty Rscript --vanilla tools/R/setup.R
 }
 
@@ -52,12 +82,42 @@ wdirname () {
 
 
 wup () {
-    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname), excluding non-git files" && return 1
-    TMPDIR="$(mktemp -d)"
-    ERSYNC="${RSYNC} --exclude-from=$(git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes; echo ${TMPDIR}/excludes) ${@} ./ ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
-    echo "${ERSYNC}"
-    ${ERSYNC}
-    rm -r "${TMPDIR}"
+    END_ARGS=FALSE
+    ONLY_GIT="TRUE"
+    WTARGET="$(wdirname)"
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -a|-all)
+                ONLY_GIT=""
+                shift
+                ;;
+            -t|-target)
+                WTARGET="$2"
+                shift
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    MAYBE_SOURCE=()
+    if [ "$#" -eq 0 ]; then
+        MAYBE_SOURCE=( "./" )
+    else
+        [[ ! "${@: -1}" == [^-]* ]] && MAYBE_SOURCE=( "./" )
+    fi
+    RSYNC_ARGS=()
+    TMPDIR=""
+    if [ -n "$ONLY_GIT" ]; then
+        TMPDIR="$(mktemp -d)"
+        git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes
+        RSYNC_ARGS=( --exclude-from=$(echo ${TMPDIR}/excludes) )
+    fi
+    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/${WTARGET}, excluding non-git files" && return 1
+    wrsync "${RSYNC_ARGS[@]}" ${@} ${MAYBE_SOURCE[@]} ${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/${WTARGET}
+    [ -n "$ONLY_GIT" ] && rm -r "${TMPDIR}"
 }
 
 wdown () {
@@ -66,7 +126,7 @@ wdown () {
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
-            -a|-alldata)
+            -a|-all)
                 EXCLUDE_ALLDATATEMP=""
                 shift
                 ;;   
@@ -77,7 +137,7 @@ wdown () {
     done
     RSYNC_ARGS=()
     [ -n "$EXCLUDE_ALLDATATEMP" ] && RSYNC_ARGS=(--exclude '*/all_data_*.gdx')
-    ${RSYNC} "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
+    wrsync "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/./$1" .
 }
 
 wsub () {
@@ -191,9 +251,9 @@ wsub () {
         wssh test -f "$START"
         if [ ! $? -eq 0 ]; then
             if [ -f $START ]; then
-                ${RSYNC} $START $(basename $START)
+                wrsync -a $START $(basename $START)
                 START=$(basename $START)
-                ${RSYNC} $START ${DEST}/
+                wrsync -a $START ${DEST}/
             else
                 START="${START}/results_$(basename ${START}).gdx"
                 wssh test -f "$START"
@@ -211,9 +271,9 @@ wsub () {
         wssh test -f "$BAU"
         if [ ! $? -eq 0 ]; then
             if [ -f $BAU ]; then
-                ${RSYNC} $BAU $(basename $BAU)
+                wrsync -a $BAU $(basename $BAU)
                 BAU=$(basename $BAU)
-                ${RSYNC} $BAU ${DEST}/
+                wrsync -a $BAU ${DEST}/
             else
                 BAU="${BAU}/results_$(basename ${BAU}).gdx"
                 wssh test -f "$BAU"
@@ -229,9 +289,9 @@ wsub () {
         wssh test -f "$FIX"
         if [ ! $? -eq 0 ]; then
             if [ -f $FIX ]; then
-                ${RSYNC} $FIX $(basename $FIX)
+                wrsync -a $FIX $(basename $FIX)
                 FIX=$(basename $FIX)
-                ${RSYNC} $FIX ${DEST}/
+                wrsync -a $FIX ${DEST}/
             else            
                 FIX="${FIX}/results_$(basename ${FIX}).gdx"
                 wssh test -f "$FIX"
@@ -250,9 +310,9 @@ wsub () {
     wup
     BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -sla SC_gams -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     if [ -z "${DRY_RUN}" ]; then
-        ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+        ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
         if [ -n "$BSUB_INTERACTIVE" ]; then
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
             wdown ${JOB_NAME}
@@ -260,6 +320,43 @@ wsub () {
         fi
     fi
 }
+
+wdb () {
+    END_ARGS=FALSE
+    QUEUE=${DEFAULT_QUEUE[$DEFAULT_HOST]}
+    NPROC=${DEFAULT_NPROC[$DEFAULT_HOST]}
+    JOB_NAME=""
+    DEST="${DEFAULT_RSYNC_PREFIX[$DEFAULT_HOST]}${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)"
+    DRY_RUN=""
+    DB_OUT=""
+    EXTRA_ARGS=""
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            # WITCH
+            -o|-dbout)
+                DB_OUT="$2"
+                shift
+                shift
+                ;;   
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    SCEN="$1"
+    shift
+    GDXBAU="bau/results_bau"
+    PROCDIR="225_db_${SCEN}"
+    [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}.gdx"
+    BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]} -I -tty"
+    wup
+    echo ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+     wdown "${SCEN}/db*gdx"
+     notify-send "Done db_${SCEN}"
+}
+
 
 wdata () {
     END_ARGS=FALSE
@@ -285,12 +382,10 @@ wdata () {
         esac
     done
     JOB_NAME="data_${REG_SETUP}"
-    wup
-    cd ../witch-data && git pull && wup && cd -
-    cd ../witchtools && git pull && wup && cd -
+    wsync
     BSUB="${DEFAULT_BSUB[$DEFAULT_HOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -R span[hosts=1] -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ${DEFAULT_SSH[$DEFAULT_HOST]} ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
         notify-send "Done ${JOB_NAME}"
@@ -344,6 +439,10 @@ local_bsub () {
 
 wssh () {
    ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && $@"
+}
+
+wsshq () {
+   ${DEFAULT_SSH[$DEFAULT_HOST]} -T ${DEFAULT_HOST} "cd ${DEFAULT_WORKDIR[$DEFAULT_HOST]}/$(wdirname) && \"${@}\""
 }
 
 wcheck () {
