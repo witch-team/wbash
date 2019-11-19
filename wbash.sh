@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Host supported: athena, zeus, local
-WHOST=zeus
+WHOST=athena
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
 declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium ["local"]=fake)
 declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
@@ -12,6 +12,126 @@ declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"
 declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
 
 WAIT=T
+
+wecho-header () {
+    blue=$(tput setaf 4)
+    normal=$(tput sgr0)    
+    printf "\n${blue}${@}${normal}\n"
+}
+
+wsetup-wizard () {
+    if [ ! $WHOST = athena ]; then
+        echo "Set WHOST to athena"
+        return
+    fi
+    wecho-header '0a) Make sure you are in a WITCH cloned repo:'
+    read -p "Press [Enter] to continue, [Ctrl-C] to exit and change directory..."
+    wecho-header '0b) Choose your text editor'
+    [ -z "$EDITOR" ] && read -p "Enter editor executable (code,vi,nano,emacs): " EDITOR
+    echo "Using $EDITOR"
+    wecho-header '1) Generate SSH keys'
+    [ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen -t rsa
+    ls -alh ~/.ssh/
+    read -p "Press [Enter] to continue..."
+    wecho-header '2a) Add SSH key to GitHub'
+    printf 'Visit https://github.com/settings/ssh/new and add the following:\n'
+    cat ~/.ssh/id_rsa.pub 
+    read -p "Press [Enter] to continue..."
+    wecho-header '2b) Check SSH connection to GitHub'
+    ssh -T git@github.com
+    wecho-header '3) What is your username on athena?'
+    read -p "Enter username: " USER
+    wecho-header '4) Copy the following into ~/.ssh/config:'
+    cat <<EOF
+Host *
+     Compression yes
+     PreferredAuthentications publickey,password 
+     Protocol 2
+     ControlMaster auto
+     ControlPath   ~/.ssh/control-%h-%p-%r
+     ControlPersist 60m
+
+Host itaca
+     HostName itaca.cmcc.it
+     User $USER
+     IdentityFile ~/.ssh/id_rsa.pub
+
+Host athena
+     HostName athena
+     User $USER
+     ProxyCommand ssh itaca -W %h:%p
+     IdentityFile ~/.ssh/id_rsa.pub
+EOF
+    read -p "Press [Enter] to open ~/.ssh/config in your editor..."
+    $EDITOR ~/.ssh/config
+    wecho-header '5) Copy your public key on athena:'
+    ssh-copy-id -i ~/.ssh/id_rsa.pub itaca
+    /usr/bin/rsync -avP ~/.ssh/id_rsa.pub itaca:mykey.pub
+    ssh itaca 'ssh-copy-id -i ~/mykey.pub athena'
+    read -p "Press [Enter] to continue..."
+    wecho-header '6) Test if connection work'
+    read -p "Press [Enter] to connect to athena, then [ctrl-d] to proceed:"
+    ssh athena
+    wecho-header '7) Include the following lines in athena ~/.bashrc'
+    cat <<EOF
+# GAMS
+. /users/home/opt/gams/load_latest_GAMS_module.sh
+export PATH=$HOME/opt/gams:$PATH
+
+# R
+export R_LIBS_USER=${HOME}/.local/lib/R
+[ -d ${R_LIBS_USER} ] || mkdir -p ${R_LIBS_USER}
+module load R/r-3.4.3
+
+# GCC
+module unload GCC/gcc-4.9.4
+module load GCC/gcc-8.2.0
+GCCPATH=/users/home/opt-intel_2018/gcc/gcc-8.2.0
+export LD_LIBRARY_PATH=${GCCPATH}/lib:${GCCPATH}/lib64:${GCCPATH}/libexec:${LD_LIBRARY_PATH}
+export CPATH=${GCCPATH}/include:${CPATH}
+export C_INCLUDE_PATH=${GCCPATH}/include:${C_INCLUDE_PATH}
+export CPLUS_INCLUDE_PATH=${GCCPATH}/include:${CPLUS_INCLUDE_PATH}
+
+# GIT
+module load GIT/git-2.18.0.321
+EOF
+    read -p "Press [Enter] to open athena's bashrc locally and change it:"
+    TEMP_BASHRC=$(mktemp)
+    /usr/bin/rsync -avP athena:.bashrc $TEMP_BASHRC
+    $EDITOR $TEMP_BASHRC
+    read -p "Press [Enter] to upload the file just edited to athena's bashrc:"
+    /usr/bin/rsync -avP $TEMP_BASHRC athena:.bashrc
+    wecho-header '8) Create work link under home:'
+    ssh athena ln -sv -ni /work/${USER}/ work
+    read -p "Press [Enter] to continue..."
+    wecho-header '9) Sync witch-data and witchtools:'
+    wsync
+    read -p "Press [Enter] to continue..."
+    wecho-header '10) Install needed R libraries:'
+    TEMP_SETUP_R=$(mktemp)
+    cat <<EOF > $TEMP_SETUP_R
+r <- "https://cloud.r-project.org"
+
+if(!require(devtools)) {
+    install.packages("devtools", dependencies=TRUE, repos=r)
+}
+
+if(!require(gdxtools)) {
+    devtools::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
+}
+
+if(!require(witchtools)) {
+    if (dir.exists("../witchtools"))
+        devtools::install("../witchtools", dependencies=TRUE, repos=r)
+    else
+        devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
+}
+EOF
+    /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r $TEMP_SETUP_R athena:${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/setup.R
+    wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla setup.R
+    wecho-header "DONE!"
+}    
+    
 
 wshow () {
     SCEN="$1"
