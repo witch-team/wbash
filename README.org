@@ -1,254 +1,213 @@
-#+PROPERTY: header-args:sh :tangle .shrc-witch
-* TOC                                                                   :TOC:
- - [[#installation][Installation]]
- - [[#werr-report-shortened-error-files-for-given-resdirs][werr (report shortened error files for given resdirs)]]
- - [[#wdump-dump-symbol-from-temp-gdx-under-given-resdirs][wdump (dump symbol from temp gdx under given resdirs)]]
- - [[#wtemp-save-all-data-temp-from-two-consecutive-nash-iterations][wtemp (save all data temp from two consecutive Nash iterations)]]
- - [[#wclean-remove-225-lstouterr][wclean (remove 225*, */*{lst,out,err})]]
- - [[#wcleandir-cleancreate-procdir-and-resdir-w-common-name][wcleandir (clean/create procdir and resdir w/ common name)]]
- - [[#wrun-run-witch][wrun (run WITCH)]]
- - [[#gdiff-compare-two-gdx-files][gdiff (compare two gdx files)]]
- - [[#useful-aliases][Useful aliases]]
-   - [[#bw-show-running-jobs][bw (show running jobs)]]
-   - [[#bwg-show-running-jobs-grepped][bwg (show running jobs grepped)]]
-   - [[#bag-show-finished-jobs-grepped][bag (show finished jobs grepped)]]
-   - [[#bal-show-recently-finished-jobs][bal (show recently finished jobs)]]
-   - [[#bl-show-job-details-by-id][bl (show job details by id)]]
-   - [[#blj-show-job-details-by-name][blj (show job details by name)]]
-   - [[#bf-peek-into-job-by-id][bf (peek into job by id)]]
-   - [[#bfj-peek-into-job-by-name][bfj (peek into job by name)]]
-   - [[#bq-show-gamsserial-queues][bq (show gams/serial queues)]]
-   - [[#bk-kill-job-by-id][bk (kill job by id)]]
-   - [[#bkj-kill-job-by-name][bkj (kill job by name)]]
-   - [[#lsl-show-most-recently-modified-files][lsl (show most recently modified files)]]
-   - [[#lsld-show-most-recently-modified-directories][lsld (show most recently modified directories)]]
+
+* TOC                                                                   :TOC_5_gh:
+- [[#installation][Installation]]
+- [[#usage][Usage]]
+  - [[#setup][Setup]]
+    - [[#select-a-host-to-run-the-code][Select a host to run the code]]
+    - [[#prepare-to-run-witch-for-the-first-time][Prepare to run WITCH for the first time]]
+  - [[#witch][WITCH]]
+    - [[#generate-data-folder][Generate data folder]]
+    - [[#calibrate][Calibrate]]
+    - [[#run-witch-non-interactively][Run witch non-interactively]]
+    - [[#check-non-interactive-witch-runs][Check non-interactive WITCH runs]]
+    - [[#run-with-starting-point][Run with starting point]]
+    - [[#run-with-double-dash-parameters][Run with double-dash parameters]]
+    - [[#calibrate-in-a-local-folder][Calibrate in a local folder]]
+  - [[#sync][Sync]]
+    - [[#download-a-remote-folder][Download a remote folder]]
+    - [[#upload-a-local-folder][Upload a local folder]]
+  - [[#post-process][Post-process]]
+    - [[#show-double-dash-parameters-of-a-past-run][Show double-dash parameters of a past run]]
+    - [[#run-database-on-a-past-run-results][Run database on a past run results]]
+  - [[#misc][Misc]]
+    - [[#run-a-command-via-ssh][Run a command via ssh]]
 
 * Installation
-#+BEGIN_SRC sh :tangle no
-cd
-git clone https://github.com/jackjackk/shrc-witch.git
-echo "source ~/shrc-witch/.shrc-witch" >>.bashrc
-. ~/.bashrc
-#+END_SRC
+All commands below are to be run on your local computer. If you use Windows, make sure you work in a BASH shell prompt, e.g. via the [[https://docs.microsoft.com/en-us/windows/wsl/install-win10][Windows Subsystem for Linux]].
 
-* werr (report shortened error files for given resdirs)
-#+BEGIN_EXAMPLE
-werr RESDIR1 [RESDIR2 ...]
-#+END_EXAMPLE
-#+BEGIN_SRC sh
-werr ()
-{
-while [ "$1" != "" ]; do
-    for f in ${1}/err*; do
-        echo -e "\n\e[33m${f}:\e[0m"
-        head -n4 $f
-        egrep -i '^>>>>' $f
-        tail -n5 $f
-    done
-    shift
-done
-}
-#+END_SRC
+1. Clone this repo, e.g. in =~/dotfiles/wbash=
+   #+begin_src sh
+     cd ~/dotfiles
+     git clone git@github.com:witch-team/wbash.git
+   #+end_src
+2. Source =wbash.sh= in your =~/.bashrc=
+   #+begin_src sh
+     echo 'source ~/dotfiles/wbash/wbash.sh' >> ~/.bashrc
+   #+end_src
+   Open a new shell to make the new commands available.
+3. Make sure your github ssh key works
+   #+begin_src sh
+     ssh -T git@github.com
+   #+end_src
+4. Make sure you have configured your =~/.ssh/config= such that:
+   #+begin_src sh
+     ssh athena
+     ssh zeus
+   #+end_src
+   work, and that you have a remote =~/work= folder pointing to the right =/work/xxx= for each supercomputer.
+5. Use SSH ControlMaster to make ssh sessions persist across multiple commands (recommended for having less lag between commands), e.g. specifying in your =~/.ssh/config= sth like:
+   #+begin_example
+     Host *
+         ControlMaster auto
+         ControlPath   ~/.ssh/control-%h-%p-%r
+         ControlPersist 60m
+   #+end_example
 
-* wdump (dump symbol from temp gdx under given resdirs)
-#+BEGIN_EXAMPLE
-wdump SYMBOL RESDIR1 [RESDIR2 ...]
-#+END_EXAMPLE
-#+BEGIN_SRC sh
-wdump ()
-{
-WHAT=$1
-shift
-while [ "$1" != "" ]; do
-    for f in ${1}/all_data_temp*gdx; do
-        echo -e "\n\e[33m${f}:\e[0m" 1>&2 
-        gdxdump $f symb=${WHAT}
-    done
-    shift
-done
-}
-#+END_SRC
 
-* wtemp (save all data temp from two consecutive Nash iterations)
-#+BEGIN_EXAMPLE
-wtemp RESDIR [MATCH]
-#+END_EXAMPLE
-Files are saved as temp_XXX_a.gdx and temp_XXX_b.gdx.
-#+BEGIN_SRC sh
-wtemp ()
-{
-workdir="$1"
-match="$2"
-for f in ${workdir}/all_data_temp_${match}*; do
-fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
-until rsync ${f} ${fname}_a.gdx; do sleep 1; done
-ahash=$(md5sum ${fname}_a.gdx | cut -d' ' -f1)
-echo "${f} -> ${fname}_a.gdx (${ahash})"
-tail -n1 ${workdir}/errors_${match}*;bhash=$ahash
-while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
-until rsync ${f} ${fname}_b.gdx; do sleep 1; done
-echo "${f} -> ${fname}_b.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*;done
-}
-#+END_SRC
+* Usage
 
-* wclean (remove 225*, */*{lst,out,err})
-#+BEGIN_SRC sh
-wclean ()
-{
-rm -rv 225*
-rm -v */*{lst,out,err}
-}
-#+END_SRC
-* wcleandir (clean/create procdir and resdir w/ common name)
-#+BEGIN_EXAMPLE
-wcleandir RESDIR
-#+END_EXAMPLE
-Clean/create ~225_$RESDIR~ and ~$RESDIR~ directories.
-#+BEGIN_SRC sh
-wcleandir ()
-{
-SCENDIR=$1
-PROCDIR=225_${SCENDIR}
-if [ -d ${PROCDIR} ]; then
-rm -rf ${PROCDIR}/*
-else
-mkdir -p ${PROCDIR}
-fi
-if [ -d ${SCENDIR} ]; then
-rm ${SCENDIR}/{*lst,job*{out,err}}
-else
-mkdir -p ${SCENDIR}
-fi
-}
-#+END_SRC
+** Setup
 
-* wrun (run WITCH)
-#+BEGIN_EXAMPLE
-wrun bau 2 --policy=bau
-#+END_EXAMPLE
-Run WITCH with argument ~--policy=bau~ under a job named ~bau~ with 2 processors.
-#+BEGIN_SRC sh
-wrun ()
-{
-RUN=$1
-NPROC=$2
-mkdir -p ${RUN} 225_${RUN}
-bsub -n${NPROC} -J "$RUN" -R "span[hosts=1]" -q serial_24h -o ${RUN}/job_${RUN}.out -e ${RUN}/job_${RUN}.err gams call_default.gms Output="${RUN}/${RUN}.lst" Procdir=225_${RUN} --nameout="${RUN}" --workdir=$RUN --gdxout=results_${RUN} ${@:3}
-}
-#+END_SRC
-* gdiff (compare two gdx files)
-#+BEGIN_EXAMPLE
-gdiff SYMBOL "COMMA,SEPARATED,MATCHES" GDX1 GDX2
-#+END_EXAMPLE
-Inline comparison of ~$SYMBOL~ values between ~$GDX1~ and ~$GDX2~, considering
-only those entries matching the provided strings. Partial match assumed except
-for numbers (e.g. "ura" will match "uranium", but "1" will just match "1", not
-"10"). MAKE SURE YOU DON'T USE ANY "*zzz.txt" FILES!
-#+BEGIN_SRC sh
-  gdiff ()
-  {
-      type dwdiff &>nul 2>&1;
-      if [ $? -eq 0 ]; then
-          CMD=dwdiff;
-      else
-          if [ ! -f dwdiff ]; then
-              echo 'WARN: dwdiff tool not found... downloading'
-              curl http://os.ghalkes.nl/dist/dwdiff-2.1.0.tar.bz2 > dwdiff-2.1.0.tar.bz2
-              tar xjf dwdiff-2.1.0.tar.bz2 
-              cd dwdiff-2.1.0
-              ./configure
-              make all
-              mv dwdiff ../
-              cd ..
-              rm -rf dwdiff-2.1.0.tar.bz2 dwdiff-2.1.0
-              CMD=./dwdiff;
-          fi
-      fi;
-      SYMB=$1;
-      MATCHES=$2
-      DMPLIST=(one two);
-      IGDX=0;
-      AWKPARAM="/\"$(sed 's|,|[a-z]*"/ \&\& /"|g' <<<"${MATCHES}")[a-z]*\"/"
-      for GDX in ${@:3};
-      do
-          echo $GDX;
-          DMP=${GDX%.gdx}zzz.txt;
-          rm -fv "$DMP"
-          gdxdump $GDX symb=$SYMB format=csv | awk "$AWKPARAM" | sed 's/","/ /g;s/"//g;s/,/ /;' > "$DMP"
-          DMPLIST[IGDX]=$DMP;
-          let IGDX=IGDX+1;
-      done;
-      $CMD -c -L -d' ,.' ${DMPLIST[@]}
-  }
+*** Select a host to run the code
+#+begin_src sh
+export WHOST=zeus
+export WHOST=athena
+export WHOST=local
+#+end_src
+3 hosts are supported: =zeus= and =athena= will run the code on the respective supercomputer. =local= will run code locally on your computer. You can change the default (currently =zeus=) at the beginning of =wbash.sh=.
 
-#+END_SRC
-* Useful aliases
+The directory used on WHOST depends on
+1) WHOST
+2) your current local directory name (WD)
+3) the git branch you are in (BRANCH)
+as follows:
+| WHOST       | WD           | BRANCH         | work dir on WHOST         |
+|-------------+--------------+----------------+---------------------------|
+| local       |              |                | current dir               |
+| athena/zeus | witch-BRANCH |                | WHOST:~/work/witch-BRANCH |
+|             | witch-master |                | WHOST:~/work/witch        |
+|             | witch        | BRANCH==master | WHOST:~/work/witch        |
+|             | witch        | BRANCH!=master | WHOST:~/work/witch-BRANCH |
 
-** bw (show running jobs)
-#+BEGIN_SRC sh
-alias bw='bjobs -w'
-#+END_SRC
 
-** bwg (show running jobs grepped)
-#+BEGIN_SRC sh
-alias bwg='bjobs -w | egrep -i'
-#+END_SRC
+*** Prepare to run WITCH for the first time
+#+begin_src sh
+git clone git@github.com:witch-team/witch.git
+cd witch
+wsetup
+#+end_src
+This will:
+- clone =../witch-data= if it does not exist, pull it, then sync it to WHOST
+- clone =../witchtools= if it does not exist, pull it, then sync it to WHOST
+- pull current dir, then sync it to WHOST
+- run =tools/R/setup.R= on WHOST, which will install basic R dependencies
 
-** bag (show finished jobs grepped)
-#+BEGIN_SRC sh
-alias bag='bjobs -aw | grep -i'
-#+END_SRC
+** WITCH
 
-** bal (show recently finished jobs)
-#+BEGIN_SRC sh
-alias bal='bjobs -aw | tail'
-#+END_SRC
+*** Generate data folder
+To generate =data_witch17=:
+#+begin_src sh
+wdata -i
+#+end_src
+This will:
+- sync =../witch-data= and =./= to host
+- run =translate_witch_data.R= interactively (drop =-i= to launch a job non-interactively)
+- download the resulting =data_witch17= folder (needs to be done manually if non-interactive).
+Use =-r xxx= to use regional setup =xxx=.
 
-** bl (show job details by id)
-If no job id is given, show last submitted running job.
-#+BEGIN_SRC sh
-alias bl='bjobs -l'
-#+END_SRC
+*** Calibrate
+#+begin_src sh
+  wsub -j calib -i -c
+#+end_src
+This will:
+- sync =../witch-data= and =./= to host
+- submit a job on WHOST named =calib= that runs =gams run_witch.gms= set up for calibration
+- at the end download =data_witch17= and a =calib= folder with these contents:
+  #+begin_example
+    calib
+    ├── calib.err
+    ├── calib.lst
+    ├── calib.out
+    ├── errors_calib.txt
+    └── results_calib.gdx
+  #+end_example
 
-** blj (show job details by name)
-#+BEGIN_SRC sh
-alias blj='bjobs -l -J'
-#+END_SRC
+File names follow the job name (i.e. the one specified after =-j=).
 
-** bf (peek into job by id)
-If no job id is given, show last submitted running job.
-#+BEGIN_SRC sh
-alias bf='bpeek -f'
-#+END_SRC
+*** Run witch non-interactively
+Drop the =-i= after =wsub= (this won't affect local runs).
 
-** bfj (peek into job by name)
-#+BEGIN_SRC sh
-alias bfj='bpeek -f -J'
-#+END_SRC
+*** Check non-interactive WITCH runs 
+To list all running jobs:
+#+begin_src sh
+wcheck
+#+end_src
 
-** bq (show gams/serial queues)
-#+BEGIN_SRC sh
-alias bq='bqueues | egrep "(QUEUE_NAME|serial|gams)"'
-#+END_SRC
+To attach to the console output of a running job named =bau=:
+#+begin_src sh
+wcheck bau
+#+end_src
 
-** bk (kill job by id)
-Provide 0 to kill all jobs.
-#+BEGIN_SRC sh
-alias bk='bkill'
-#+END_SRC
+To check the =errors_*.txt= file of job =bau=:
+#+begin_src sh
+werr bau
+#+end_src
 
-** bkj (kill job by name)
-#+BEGIN_SRC sh
-alias bkj='bkill -J'
-#+END_SRC
+*** Run with starting point
+To run a bau using =calib/results_calib.gdx= as starting gdx:
+#+begin_src sh
+wsub -j bau -s calib
+#+end_src
+Notice that it's enough to specify =calib=. This will be translated into =calib/results_calib=. You can also specify a local gdx file after =-s=. If so, this will be moved to the current folder, synced to host, and used as a startgdx. The same mechanism holds for:
+- -f :: for gdxfix
+- -b :: for baugdx
 
-** lsl (show most recently modified files)
-#+BEGIN_SRC sh
-alias lsl='ls -lct | head -n20'
-#+END_SRC
+Add =-S= for =startboost=.
 
-** lsld (show most recently modified directories)
-225* directories are omitted.
-#+BEGIN_SRC sh
-alias lsld='ls -lcth | egrep "^d" | grep -v " 225_" | head -n20'
-#+END_SRC
+*** Run with double-dash parameters
+To pass double-dash parameters to gams, just specify them at the end:
+#+begin_src sh
+wsub -j wb600 --policy=innopaths --scen=wb600
+#+end_src
+
+*** Calibrate in a local folder
+#+begin_src sh
+wsub -j calib_xxx -C
+#+end_src
+Notice the upper-case =-C= instead of =-c=. To later use this calibration in a =bau= for example, run:
+#+begin_src sh
+wsub -j bau_xxx -i -u calib_xxx
+#+end_src
+This will also set start and bau gdx to =calib_xxx/results_calib_xxx=.
+
+** Sync
+
+*** Download a remote folder
+To download the remote folder =xxx= from the remost working dir, use:
+#+begin_src sh
+wdown xxx
+#+end_src
+Use =wdown -a xxx= to download also the =all_data_temp*.gdx=.
+
+*** Upload a local folder
+To upload the local folder =yyy=, use:
+#+begin_src sh
+wup yyy
+#+end_src
+By default:
+- w/o arguments the current dir is uploaded;
+- only versioned files are uploaded; to include non-git files, use =-a= before =yyy=;
+- target folder name on WHOST is the same, to use a different name, e.g. =zzz=, use =-t zzz= before =yyy=.
+
+** Post-process
+
+*** Show double-dash parameters of a past run
+If the run was named =bau=, use:
+#+begin_src sh
+wshow bau
+#+end_src
+
+*** Run database on a past run results
+If the run was named =ctax=, use:
+#+begin_src sh
+wdb ctax
+#+end_src
+After running the command above, the =ctax/= local folder will be updated with the generated db files. Use =-o= switch to specify a gdx out db name, and =-b= to specify a bau gdx different than =bau/results_bau=.
+
+** Misc
+
+*** Run a command via ssh
+To run a command, e.g. =ls -clt=, in WHOST working dir, use:
+#+begin_src sh
+wssh ls -clt
+#+end_src
