@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # Host supported: athena, zeus, local
 WHOST=athena
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
@@ -12,6 +13,10 @@ declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"
 declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
 
 WAIT=T
+
+if [ "$PS4" = "+ " ]; then
+    export PS4=$'\e[33m[wbash/$(eval echo $WHOST)]\e[0m '
+fi
 
 wecho-header () {
     blue=$(tput setaf 4)
@@ -156,8 +161,9 @@ wrsync () {
     done
     RSYNC_ARGS=()
     [ -n "$RELATIVE" ] && RSYNC_ARGS=( --relative )
-    echo /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+    set -x
     /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+    { set +x; } 2>/dev/null
 }
 
 wdefault () {
@@ -259,7 +265,7 @@ wdown () {
     wrsync "${RSYNC_ARGS[@]}" "${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/./$1" .
 }
 
-wsub () {
+wrun () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE[$WHOST]}
     NPROC=${DEFAULT_NPROC[$WHOST]}
@@ -358,7 +364,7 @@ wsub () {
                 ;;
         esac
     done
-    [ -z "$JOB_NAME" ] && echo "Usage: wsub -j job-name [...]" && return 1
+    [ -z "$JOB_NAME" ] && echo "Usage: wrun -j job-name [...]" && return 1
     [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --calibration=1"
     [ -n "$RESDIR_CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --write_tfp_file=resdir --calibgdxout=${JOB_NAME}/data_calib_${JOB_NAME}"
     if [ -n "$USE_CALIB" ]; then
@@ -429,9 +435,11 @@ wsub () {
     wup
     BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
     if [ -z "${DRY_RUN}" ]; then
-        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+        CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+        set -x
+        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+        { set +x; } 2>/dev/null
         if [ -n "$BSUB_INTERACTIVE" ]; then
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown data_${REG_SETUP}
             wdown ${JOB_NAME}
@@ -482,6 +490,55 @@ wdb () {
 }
 
 
+wgams () {
+    END_ARGS=FALSE
+    QUEUE=${DEFAULT_QUEUE[$WHOST]}
+    NPROC=${DEFAULT_NPROC[$WHOST]}
+    JOB_NAME=""
+    BSUB_INTERACTIVE=""
+    DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+    REG_SETUP=""
+    DRY_RUN=""
+    EXTRA_ARGS=""
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            # BSUB
+            -j|-job)
+                JOB_NAME="$2"
+                shift
+                shift
+                ;;
+            -i|-interactive)
+                BSUB_INTERACTIVE=TRUE
+                shift
+                ;;
+            -q|-queue)
+                QUEUE="$2"
+                shift
+                shift
+                ;;
+            -n|-nproc)
+                NPROC="$2"
+                shift
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    [ -z "$JOB_NAME" ] && echo "Usage: wrun -j job-name [...]" && return 1
+    BSUB="${DEFAULT_BSUB[$WHOST]}"
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
+    PROCDIR="225_${JOB_NAME}"
+    wup
+    set -x
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
+    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME"
+    { set +x; } 2>/dev/null
+}
+
 wdata () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
@@ -509,7 +566,10 @@ wdata () {
     wsync
     BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+    set -x
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
         notify-send "Done ${JOB_NAME}"
@@ -562,7 +622,10 @@ local_bsub () {
 }
 
 wssh () {
-   ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && $@"
+    CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+    # set -x
+    ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${CHDIR} && $@"
+    # { set +x; } 2>/dev/null
 }
 
 wsshq () {
@@ -588,7 +651,7 @@ werr () {
 }
 
     
-#     [ $# -lt 3 ] && echo 'Usage: wsub [job-name] [ncpu]exit 1
+#     [ $# -lt 3 ] && echo 'Usage: wrun [job-name] [ncpu]exit 1
 #     mkdir -p ${JOB_NAME}
 #     bsub -J ${JOB_NAME} -I -R span[hosts=1] -sla SC_gams -n $(3) -q poe_medium -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err '$(2)'
 

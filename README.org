@@ -35,24 +35,10 @@ All commands below are to be run on your local computer. If you use Windows, mak
      echo 'source ~/dotfiles/wbash/wbash.sh' >> ~/.bashrc
    #+end_src
    Open a new shell to make the new commands available.
-3. Make sure your github ssh key works
+3. Follow the setup wizard:
    #+begin_src sh
-     ssh -T git@github.com
+     wsetup-wizard
    #+end_src
-4. Make sure you have configured your =~/.ssh/config= such that:
-   #+begin_src sh
-     ssh athena
-     ssh zeus
-   #+end_src
-   work, and that you have a remote =~/work= folder pointing to the right =/work/xxx= for each supercomputer.
-5. Use SSH ControlMaster to make ssh sessions persist across multiple commands (recommended for having less lag between commands), e.g. specifying in your =~/.ssh/config= sth like:
-   #+begin_example
-     Host *
-         ControlMaster auto
-         ControlPath   ~/.ssh/control-%h-%p-%r
-         ControlPersist 60m
-   #+end_example
-
 
 * Usage
 
@@ -107,7 +93,7 @@ Use =-r xxx= to use regional setup =xxx=.
 
 *** Calibrate
 #+begin_src sh
-  wsub -j calib -i -c
+  wrun -j calib -i -c
 #+end_src
 This will:
 - sync =../witch-data= and =./= to host
@@ -125,7 +111,7 @@ This will:
 File names follow the job name (i.e. the one specified after =-j=).
 
 *** Run witch non-interactively
-Drop the =-i= after =wsub= (this won't affect local runs).
+Drop the =-i= after =wrun= (this won't affect local runs).
 
 *** Check non-interactive WITCH runs 
 To list all running jobs:
@@ -146,7 +132,7 @@ werr bau
 *** Run with starting point
 To run a bau using =calib/results_calib.gdx= as starting gdx:
 #+begin_src sh
-wsub -j bau -s calib
+wrun -j bau -s calib
 #+end_src
 Notice that it's enough to specify =calib=. This will be translated into =calib/results_calib=. You can also specify a local gdx file after =-s=. If so, this will be moved to the current folder, synced to host, and used as a startgdx. The same mechanism holds for:
 - -f :: for gdxfix
@@ -157,16 +143,16 @@ Add =-S= for =startboost=.
 *** Run with double-dash parameters
 To pass double-dash parameters to gams, just specify them at the end:
 #+begin_src sh
-wsub -j wb600 --policy=innopaths --scen=wb600
+wrun -j wb600 --policy=innopaths --scen=wb600
 #+end_src
 
 *** Calibrate in a local folder
 #+begin_src sh
-wsub -j calib_xxx -C
+wrun -j calib_xxx -C
 #+end_src
 Notice the upper-case =-C= instead of =-c=. To later use this calibration in a =bau= for example, run:
 #+begin_src sh
-wsub -j bau_xxx -i -u calib_xxx
+wrun -j bau_xxx -i -u calib_xxx
 #+end_src
 This will also set start and bau gdx to =calib_xxx/results_calib_xxx=.
 
