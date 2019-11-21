@@ -109,34 +109,12 @@ EOF
     wecho-header '8) Create work link under home:'
     ssh athena ln -sv -ni /work/${USER}/ work
     read -p "Press [Enter] to continue..."
-    wecho-header '9) Sync witch-data and witchtools:'
-    wsync
+    wecho-header '9) Sync witch-data & witchtools and install needed R libraries:'
+    wsetup
     read -p "Press [Enter] to continue..."
-    wecho-header '10) Install needed R libraries:'
-    TEMP_SETUP_R=$(mktemp)
-    cat <<EOF > $TEMP_SETUP_R
-r <- "https://cloud.r-project.org"
-
-if(!require(devtools)) {
-    install.packages("devtools", dependencies=TRUE, repos=r)
+    wecho-header '10) DONE!'
 }
 
-if(!require(gdxtools)) {
-    devtools::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
-}
-
-if(!require(witchtools)) {
-    if (dir.exists("../witchtools"))
-        devtools::install("../witchtools", dependencies=TRUE, repos=r)
-    else
-        devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
-}
-EOF
-    /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r $TEMP_SETUP_R athena:${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/setup.R
-    wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla setup.R
-    wecho-header "DONE!"
-}    
-    
 
 wshow () {
     SCEN="$1"
@@ -188,7 +166,29 @@ wsync () {
 
 wsetup () {
     wsync
-    [ "$WHOST" = local ] && Rscript --vanilla tools/R/setup.R || wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla tools/R/setup.R
+    TEMP_SETUP_R=$(mktemp --suffix='.R')
+    cat <<EOF > $TEMP_SETUP_R
+r <- "https://cloud.r-project.org"
+
+if(!require(devtools)) {
+    install.packages("devtools", dependencies=TRUE, repos=r)
+}
+
+if(!require(gdxtools)) {
+    devtools::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
+}
+
+if(!require(witchtools)) {
+    if (dir.exists("../witchtools"))
+        devtools::install("../witchtools", dependencies=TRUE, repos=r)
+    else
+        devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
+}
+EOF
+    wrsync -a $TEMP_SETUP_R ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
+    wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla $(basename $TEMP_SETUP_R)
+    wssh rm -v $(basename $TEMP_SETUP_R)
+    rm -v $TEMP_SETUP_R
 }
 
 wdirname () {
@@ -623,9 +623,9 @@ local_bsub () {
 
 wssh () {
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
-    # set -x
+    set -x
     ${DEFAULT_SSH[$WHOST]} -T ${WHOST} "cd ${CHDIR} && $@"
-    # { set +x; } 2>/dev/null
+    { set +x; } 2>/dev/null
 }
 
 wsshq () {
