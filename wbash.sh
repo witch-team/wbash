@@ -74,7 +74,7 @@ module load gcc_9.1.0/9.1.0
 module load curl/7.66.0
 
 # R
-export R_LIBS_USER=R/x86_64-pc-linux-gnu-library/3.6
+export R_LIBS_USER=~/R/x86_64-pc-linux-gnu-library/3.6
 [ -d ${R_LIBS_USER} ] || mkdir -p ${R_LIBS_USER}
 module load gcc_9.1.0/R/3.6.1
 
@@ -140,7 +140,7 @@ EOF
 export PATH=$HOME/opt/gams:$PATH
 
 # R
-export R_LIBS_USER=${HOME}/.local/lib/R
+export R_LIBS_USER=~/R/x86_64-pc-linux-gnu-library/3.4
 [ -d ${R_LIBS_USER} ] || mkdir -p ${R_LIBS_USER}
 module load R/r-3.4.3
 
@@ -528,6 +528,15 @@ wrun () {
             notify-send "Done ${JOB_NAME}"
         fi
     fi
+}
+
+wworktree () {
+    BRANCH="$1"
+    _REMOTE="$2"
+    REMOTE="${REMOTE:-origin}"
+    set -x
+    git worktree add -b $BRANCH ../witch-${BRANCH} ${REMOTE}/${BRANCH}
+    { set +x; } 2>/dev/null
 }
 
 wdb () {
