@@ -24,29 +24,85 @@ wecho-header () {
     printf "\n${blue}${@}${normal}\n"
 }
 
-wsetup-wizard () {
-    if [ ! $WHOST = athena ]; then
-        echo "Set WHOST to athena"
-        return
-    fi
-    wecho-header '0a) Make sure you are in a WITCH cloned repo:'
-    read -p "Press [Enter] to continue, [Ctrl-C] to exit and change directory..."
-    wecho-header '0b) Choose your text editor'
+wecho-confirm () {
+  while true; do
+    read -r -n 1 -p "${1:-Continue?} [y/n]: " REPLY
+    case $REPLY in
+      [yY]) echo ; return 0 ;;
+      [nN]) echo ; return 1 ;;
+      *) printf " \033[31m %s \n\033[0m" "invalid input"
+    esac 
+  done  
+}
+
+wsetup-zeus () {
     [ -z "$EDITOR" ] && read -p "Enter editor executable (code,vi,nano,emacs): " EDITOR
-    echo "Using $EDITOR"
-    wecho-header '1) Generate SSH keys'
-    [ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen -t rsa
-    ls -alh ~/.ssh/
-    read -p "Press [Enter] to continue..."
-    wecho-header '2a) Add SSH key to GitHub'
-    printf 'Visit https://github.com/settings/ssh/new and add the following:\n'
-    cat ~/.ssh/id_rsa.pub 
-    read -p "Press [Enter] to continue..."
-    wecho-header '2b) Check SSH connection to GitHub'
-    ssh -T git@github.com
-    wecho-header '3) What is your username on athena?'
+    STEP="$1"
+    wecho-header "${STEP}) Setup Zeus"
+    wecho-confirm || return 1
+    wecho-header "${STEP}a) What is your username on zeus?"
     read -p "Enter username: " USER
-    wecho-header '4) Copy the following into ~/.ssh/config:'
+    wecho-header "${STEP}b) Copy the following into ~/.ssh/config:"
+    cat <<EOF
+Host *
+     Compression yes
+     PreferredAuthentications publickey,password 
+     Protocol 2
+     ControlMaster auto
+     ControlPath   ~/.ssh/control-%h-%p-%r
+     ControlPersist 60m
+
+Host zeus
+     Hostname zeus01.cmcc.scc
+     User $USER
+     IdentityFile ~/.ssh/id_rsa.pub
+EOF
+    read -p "Press [Enter] to open ~/.ssh/config in your editor..."
+    $EDITOR ~/.ssh/config
+    wecho-header "${STEP}c) Copy your public key on zeus:"
+    ssh-copy-id -i ~/.ssh/id_rsa.pub zeus
+    read -p "Press [Enter] to continue..."
+    wecho-header "${STEP}d) Test if connection work"
+    read -p "Press [Enter] to connect to zeus, afterwards [ctrl-d] to proceed:"
+    ssh zeus
+    wecho-header "${STEP}e) Include the following lines in zeus ~/.bashrc"
+    cat <<'EOF'
+# gcc compiler
+module load gcc_9.1.0/9.1.0
+
+# curl
+module load curl/7.66.0
+
+# R
+export R_LIBS_USER=R/x86_64-pc-linux-gnu-library/3.6
+[ -d ${R_LIBS_USER} ] || mkdir -p ${R_LIBS_USER}
+module load gcc_9.1.0/R/3.6.1
+
+# GAMS
+module load gams/28.2.0
+EOF
+    read -p "Press [Enter] to open zeus' bashrc locally and change it:"
+    TEMP_BASHRC=$(mktemp)
+    /usr/bin/rsync -avP zeus:.bashrc $TEMP_BASHRC
+    $EDITOR $TEMP_BASHRC
+    read -p "Press [Enter] to upload the file just edited to zeus' bashrc:"
+    /usr/bin/rsync -avP $TEMP_BASHRC zeus:.bashrc
+    wecho-header "${STEP}f) Create work link under home:"
+    ssh zeus ln -sv -ni /work/seme/${USER}/ work
+    read -p "Press [Enter] to continue..."
+    wecho-header "${STEP}g) Sync witch-data & witchtools and install needed R libraries:"
+    wecho-confirm && WHOST=zeus wsetup
+    read -p "Press [Enter] to continue..."
+}
+
+wsetup-athena () {
+    [ -z "$EDITOR" ] && read -p "Enter editor executable (code,vi,nano,emacs): " EDITOR
+    STEP="$1"
+    wecho-header "${STEP}) Setup Athena"
+    wecho-confirm || return 1
+    wecho-header "${STEP}a) What is your username on athena?"
+    read -p "Enter username: " USER
+    wecho-header "${STEP}b) Copy the following into ~/.ssh/config:"
     cat <<EOF
 Host *
      Compression yes
@@ -69,16 +125,16 @@ Host athena
 EOF
     read -p "Press [Enter] to open ~/.ssh/config in your editor..."
     $EDITOR ~/.ssh/config
-    wecho-header '5) Copy your public key on athena:'
+    wecho-header "${STEP}c) Copy your public key on athena:"
     ssh-copy-id -i ~/.ssh/id_rsa.pub itaca
     /usr/bin/rsync -avP ~/.ssh/id_rsa.pub itaca:mykey.pub
     ssh itaca 'ssh-copy-id -i ~/mykey.pub athena'
     read -p "Press [Enter] to continue..."
-    wecho-header '6) Test if connection work'
+    wecho-header "${STEP}d) Test if connection work"
     read -p "Press [Enter] to connect to athena, then [ctrl-d] to proceed:"
     ssh athena
-    wecho-header '7) Include the following lines in athena ~/.bashrc'
-    cat <<EOF
+    wecho-header "${STEP}e) Include the following lines in athena ~/.bashrc"
+    cat <<'EOF'
 # GAMS
 . /users/home/opt/gams/load_latest_GAMS_module.sh
 export PATH=$HOME/opt/gams:$PATH
@@ -106,13 +162,39 @@ EOF
     $EDITOR $TEMP_BASHRC
     read -p "Press [Enter] to upload the file just edited to athena's bashrc:"
     /usr/bin/rsync -avP $TEMP_BASHRC athena:.bashrc
-    wecho-header '8) Create work link under home:'
+    wecho-header "${STEP}f) Create work link under home:"
     ssh athena ln -sv -ni /work/${USER}/ work
     read -p "Press [Enter] to continue..."
-    wecho-header '9) Sync witch-data & witchtools and install needed R libraries:'
-    wsetup
+    wecho-header "${STEP}g) Sync witch-data & witchtools and install needed R libraries:"
+    wecho-confirm && WHOST=athena wsetup
     read -p "Press [Enter] to continue..."
-    wecho-header '10) DONE!'
+}
+
+wsetup-ssh () {
+    [ -z "$EDITOR" ] && read -p "Enter editor executable (code,vi,nano,emacs): " EDITOR
+    STEP="$1"
+    wecho-header "${STEP}a) Generate SSH keys"
+    [ ! -f ~/.ssh/id_rsa.pub ] && ssh-keygen -t rsa
+    ls -alh ~/.ssh/
+    read -p "Press [Enter] to continue..."
+    wecho-header "${STEP}b) Add SSH key to GitHub"
+    printf 'Visit https://github.com/settings/ssh/new and add the following:\n'
+    cat ~/.ssh/id_rsa.pub 
+    read -p "Press [Enter] to continue..."
+    wecho-header "${STEP}c) Check SSH connection to GitHub"
+    ssh -T git@github.com
+}
+
+wsetup-wizard () {
+    wecho-header '0a) Make sure you are in a WITCH cloned repo:'
+    read -p "Press [Enter] to continue, [Ctrl-C] to exit and change directory..."
+    wecho-header '0b) Choose your text editor'
+    [ -z "$EDITOR" ] && read -p "Enter editor executable (code,vi,nano,emacs): " EDITOR
+    echo "Using $EDITOR"
+    EDITOR=$EDITOR wsetup-ssh 2
+    EDITOR=$EDITOR wsetup-athena 3
+    EDITOR=$EDITOR wsetup-zeus 4
+    wecho-header '5) DONE!'
 }
 
 
