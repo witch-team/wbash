@@ -266,6 +266,10 @@ if(!require(witchtools)) {
     else
         devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
 }
+
+if(!require(hector)) {
+    devtools::install_github('witch-team/hector', dependencies=TRUE, repos=r)
+}
 EOF
     wrsync -a $TEMP_SETUP_R ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
     wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla $(basename $TEMP_SETUP_R)
