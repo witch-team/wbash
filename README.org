@@ -1,6 +1,8 @@
 
 * TOC                                                                   :TOC_5_gh:
 - [[#installation][Installation]]
+  - [[#on-windows][On Windows]]
+  - [[#on-linux][On Linux]]
 - [[#usage][Usage]]
   - [[#setup][Setup]]
     - [[#select-a-host-to-run-the-code][Select a host to run the code]]
@@ -23,7 +25,14 @@
     - [[#run-a-command-via-ssh][Run a command via ssh]]
 
 * Installation
-All commands below are to be run on your local computer. If you use Windows, make sure you work in a BASH shell prompt, e.g. via the [[https://docs.microsoft.com/en-us/windows/wsl/install-win10][Windows Subsystem for Linux]].
+
+** On Windows
+1. Install Ubuntu via the [[https://docs.microsoft.com/en-us/windows/wsl/install-win10][Windows Subsystem for Linux (WSL)]].
+2. Follow the instructions to use [[https://code.visualstudio.com/][Visual Studio Code in WSL]].
+3. Open a terminal and follow the instructions for [[#on-linux][Linux]] below.
+
+** On Linux
+All commands below are to be run in a terminal on your local computer.
 
 1. Clone this repo, e.g. in =~/dotfiles/wbash=
    #+begin_src sh
