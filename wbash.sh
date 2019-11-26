@@ -206,7 +206,6 @@ wshow () {
 wrsync () {
     END_ARGS=FALSE
     RELATIVE="TRUE"
-    WTARGET="$(wdirname)"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -299,7 +298,7 @@ wup () {
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
-            -a|-all)
+            -l|-all)
                 ONLY_GIT=""
                 shift
                 ;;
@@ -629,10 +628,64 @@ wgams () {
     PROCDIR="225_${JOB_NAME}"
     wup
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
-    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME"
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
+    RETVAL=$?
     { set +x; } 2>/dev/null
+    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
+
+    return $RETVAL
 }
+
+wsub () {
+    END_ARGS=FALSE
+    QUEUE=${DEFAULT_QUEUE[$WHOST]}
+    NPROC=${DEFAULT_NPROC[$WHOST]}
+    JOB_NAME=""
+    BSUB_INTERACTIVE=""
+    DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+    REG_SETUP=""
+    DRY_RUN=""
+    EXTRA_ARGS=""
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            # BSUB
+            -j|-job)
+                JOB_NAME="$2"
+                shift
+                shift
+                ;;
+            -i|-interactive)
+                BSUB_INTERACTIVE=TRUE
+                shift
+                ;;
+            -q|-queue)
+                QUEUE="$2"
+                shift
+                shift
+                ;;
+            -n|-nproc)
+                NPROC="$2"
+                shift
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    [ -z "$JOB_NAME" ] && echo "Usage: wrun -j job-name [...]" && return 1
+    BSUB="${DEFAULT_BSUB[$WHOST]}"
+    [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
+    wup
+    set -x
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"${@}\""
+    RETVAL=$?
+    { set +x; } 2>/dev/null
+    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
+    return $RETVAL
+}
+
 
 wdata () {
     END_ARGS=FALSE
@@ -946,22 +999,22 @@ werr () {
 #     $CMD -c -L -d' ,.' ${DMPLIST[@]}
 # }
 
-# local_ssh () {
-#     END_ARGS=FALSE
-#     while [ $END_ARGS = FALSE ]; do
-#         key="$1"
-#         case $key in
-#             -T)
-#                 shift
-#                 ;;
-#             *)
-#                 END_ARGS=TRUE
-#                 ;;
-#         esac
-#     done
-#     shift
-#     eval "$@"
-# }
+local_ssh () {
+    END_ARGS=FALSE 
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -T)
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
+    shift
+    eval "$@"
+}
 
 # alias bw='bjobs -w'
 
