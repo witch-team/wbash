@@ -221,7 +221,7 @@ wrsync () {
     RSYNC_ARGS=()
     [ -n "$RELATIVE" ] && RSYNC_ARGS=( --relative )
     set -x
-    /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+    /usr/bin/rsync -avP -zz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
     { set +x; } 2>/dev/null
 }
 
@@ -278,20 +278,32 @@ EOF
 
 wdirname () {
     # Name of directory under DEFAULT_WORKDIR to use for upload
-    BRANCH="$(git branch --show-current)"
     PWD="$(basename $(pwd))"
-    DESTDIR=""
-    if [ -n "${DEFAULT_WDIR_SAME[$WHOST]}" ]; then
-        DESTDIR="${PWD}"
-    else
-        [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
-        DESTDIR=${DESTDIR%-master}
+    DESTDIR="${PWD}"
+    if [ -z "${DEFAULT_WDIR_SAME[$WHOST]}" ]; then
+        if [ -d .git ]; then
+            BRANCH="$(git branch --show-current)"
+            [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
+        fi
     fi
+    DESTDIR=${DESTDIR%-master}
     echo "${DESTDIR}"
 }
 
 
 wup () {
+    read -r -d '' USAGE <<- EOM
+    Upload SOURCE to ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/TARGET
+    By default, TARGET="$(wdirname)".
+    To upload current directory, use "." as SOURCE.
+    If ALL not specified, upload only git-versioned files.
+
+    Usage: wup [options] [wrsync arguments] SOURCE
+    
+    Options
+    -l|-all             Upload also gitignored files
+    -t|-target TARGET   Upload to subdir TARGET
+EOM
     END_ARGS=FALSE
     ONLY_GIT="TRUE"
     WTARGET="$(wdirname)"
@@ -313,11 +325,8 @@ wup () {
         esac
     done
     MAYBE_SOURCE=()
-    if [ "$#" -eq 0 ]; then
-        MAYBE_SOURCE=( "./" )
-    else
-        [[ ! "${@: -1}" == [^-]* ]] && MAYBE_SOURCE=( "./" )
-    fi
+    [ $# -eq 0 ] && echo "$USAGE" && return 1
+    [[ ! "${@: -1}" == [^-]* ]] && echo "$USAGE" && return 1
     RSYNC_ARGS=()
     TMPDIR=""
     if [ -n "$ONLY_GIT" ]; then
@@ -325,18 +334,29 @@ wup () {
         git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes
         RSYNC_ARGS=( --exclude-from=$(echo ${TMPDIR}/excludes) )
     fi
-    [ "$1" = '-h' ] && echo "Upload ./ to ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}, excluding non-git files" && return 1
-    wrsync "${RSYNC_ARGS[@]}" ${@} ${MAYBE_SOURCE[@]} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
+    wrsync "${RSYNC_ARGS[@]}" ${@} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
+    RET=$?
     [ -n "$ONLY_GIT" ] && rm -r "${TMPDIR}"
+    return $RET
 }
 
 wdown () {
+    read -r -d '' USAGE <<- EOM
+    Download SUBDIR from "${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)" using relative paths.
+    Exclude all_data_*.gdx files unless otherwise stated.
+
+    Usage: wdown [options] SUBDIR 
+
+    Options
+    -l|-all     Download also all_data_*.gdx file
+EOM
+    [ $# -eq 0 ] && echo "$USAGE" && return 1
     END_ARGS=FALSE
     EXCLUDE_ALLDATATEMP="TRUE"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
-            -a|-all)
+            -l|-all)
                 EXCLUDE_ALLDATATEMP=""
                 shift
                 ;;   
@@ -585,6 +605,19 @@ wdb () {
 
 
 wgams () {
+    read -r -d '' USAGE <<- EOM
+    Change dir to ${WHOST}:${DEFAULT_WORKDIR[$WHOST]}/$(wdirname), then bsub a gams job.
+    Put .out, .err and .lst files under JOB_NAME dir, use 225_JOB_NAME as procdir.
+    If interactive is on, download JOB_NAME dir after finishing.
+
+    Usage: wgams -j JOB_NAME [options] file.gms [gams arguments]
+
+    Options:
+    -j|-job JOB_NAME    Set name of the job to JOB_NAME (mandatory option)
+    -n|-nproc X         Set number of processors for the job to X
+    -i|-interactive     Wait for job to finish before returning
+    -q|-queue X         Choose queue X
+EOM
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE[$WHOST]}
     NPROC=${DEFAULT_NPROC[$WHOST]}
@@ -594,6 +627,7 @@ wgams () {
     REG_SETUP=""
     DRY_RUN=""
     EXTRA_ARGS=""
+    [ $# -eq 0 ] && echo "$USAGE" && return 1
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -628,7 +662,7 @@ wgams () {
     PROCDIR="225_${JOB_NAME}"
     wup
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
     RETVAL=$?
     { set +x; } 2>/dev/null
     [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
