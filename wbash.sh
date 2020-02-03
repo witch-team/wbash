@@ -236,13 +236,13 @@ wdefault () {
 wsync () {
     [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
     cd ../witch-data && git pull
-    [ "$WHOST" = local ] || wup -t witch-data
+    [ "$WHOST" = local ] || wup -t witch-data .
     cd -
     [ -d ../witchtools ] || git clone git@github.com:witch-team/witchtools.git ../witchtools
     cd ../witchtools && git pull
-    [ "$WHOST" = local ] || wup -t witchtools
-    cd -    
-    [ "$WHOST" = local ] || wup
+    [ "$WHOST" = local ] || wup -t witchtools .
+    cd -
+    [ "$WHOST" = local ] || wup .
 }
 
 wsetup () {
@@ -255,20 +255,21 @@ if(!require(devtools)) {
     install.packages("devtools", dependencies=TRUE, repos=r)
 }
 
-if(!require(gdxtools)) {
+#if(!require(gdxtools)) {
     devtools::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
-}
+#}
 
-if(!require(witchtools)) {
-    if (dir.exists("../witchtools"))
+#if(!require(witchtools)) {
+    if (dir.exists("../witchtools")) {
         devtools::install("../witchtools", dependencies=TRUE, repos=r)
-    else
+    } else {
         devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
-}
+    }
+#}
 
-if(!require(hector)) {
+#if(!require(hector)) {
     devtools::install_github('witch-team/hector', dependencies=TRUE, repos=r)
-}
+#}
 EOF
     wrsync -a $TEMP_SETUP_R ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
     wssh ${DEFAULT_BSUB[$WHOST]} -q ${DEFAULT_QUEUE[$WHOST]} -I -tty Rscript --vanilla $(basename $TEMP_SETUP_R)
@@ -537,7 +538,7 @@ wrun () {
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
-    wup
+    wup .
     BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     if [ -z "${DRY_RUN}" ]; then
