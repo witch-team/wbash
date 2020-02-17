@@ -2,7 +2,7 @@
 
 
 # Host supported: athena, zeus, local
-WHOST=athena
+WHOST=zeus
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
 declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=s_medium ["local"]=fake)
 declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
@@ -251,24 +251,24 @@ wsetup () {
     cat <<EOF > $TEMP_SETUP_R
 r <- "https://cloud.r-project.org"
 
-if(!require(devtools)) {
-    install.packages("devtools", dependencies=TRUE, repos=r)
+if(!require(remotes)) {
+    install.packages("remotes", dependencies=TRUE, repos=r)
 }
 
 #if(!require(gdxtools)) {
-    devtools::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
+    remotes::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
 #}
 
 #if(!require(witchtools)) {
     if (dir.exists("../witchtools")) {
-        devtools::install("../witchtools", dependencies=TRUE, repos=r)
+        devtools::install_local("../witchtools", dependencies=TRUE, repos=r)
     } else {
-        devtools::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
+        remotes::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
     }
 #}
 
 #if(!require(hector)) {
-    devtools::install_github('witch-team/hector', dependencies=TRUE, repos=r)
+    remotes::install_github('witch-team/hector', dependencies=TRUE, repos=r)
 #}
 EOF
     wrsync -a $TEMP_SETUP_R ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
@@ -727,12 +727,18 @@ wdata () {
     QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
     BSUB_INTERACTIVE=""
     REG_SETUP="witch17"
+    METHOD="witch-data"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
             # BSUB
-            -r|-regions)
+            -n|-regions)
                 REG_SETUP="$2"
+                shift
+                shift
+                ;;
+            -m|-method)
+                METHOD="$2"
                 shift
                 shift
                 ;;
@@ -751,7 +757,7 @@ wdata () {
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} -m ${METHOD} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
