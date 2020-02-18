@@ -726,6 +726,8 @@ wdata () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
     BSUB_INTERACTIVE=""
+    PIGGYBACK=""
+    NOSYNC=""
     REG_SETUP="witch17"
     METHOD="witch-data"
     while [ $END_ARGS = FALSE ]; do
@@ -746,18 +748,28 @@ wdata () {
                 BSUB_INTERACTIVE=TRUE
                 shift
                 ;;
+            -p|-piggyback)
+                PIGGYBACK=TRUE
+                shift
+                ;;
+            -N|-nosync)
+                NOSYNC=TRUE
+                shift
+                ;;
             *)
                 END_ARGS=TRUE
                 ;;
         esac
     done
     JOB_NAME="data_${REG_SETUP}"
-    wsync
+    [ -z "$NOSYNC" ] && wsync
     BSUB="${DEFAULT_BSUB[$WHOST]}"
+    SETUP="-n ${REG_SETUP}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
+    [ -z "$PIGGYBACK" ] && SETUP="${SETUP} -m witch-data"
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} -m ${METHOD} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
