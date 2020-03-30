@@ -385,6 +385,7 @@ wrun () {
     START=""
     STARTBOOST=""
     BAU=""
+    BASELINE="ssp2"
     FIX=""
     DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     REG_SETUP=""
@@ -408,6 +409,11 @@ wrun () {
                 shift
                 shift
                 ;;
+            -B|-baseline)
+                BASELINE="$2"
+                shift
+                shift
+                ;;
             -b|--bau)
                 BAU="$2"
                 shift
@@ -419,7 +425,8 @@ wrun () {
                 shift
                 ;;
             -d|-debug)
-                DEBUG=TRUE
+                DEBUG="$2"
+                shift
                 shift
                 ;;            
             -v|-verbose)
@@ -473,6 +480,7 @@ wrun () {
     [ -z "$JOB_NAME" ] && echo "Usage: wrun -j job-name [...]" && return 1
     [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --calibration=1"
     [ -n "$RESDIR_CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --write_tfp_file=resdir --calibgdxout=${JOB_NAME}/data_calib_${JOB_NAME}"
+    [ "$BASELINE" != "ssp2" ] && [ -n "$RESDIR_CALIB" ] && [ -z "$USE_CALIB" ] && echo "To calibrate ${BASELINE} within its folder you need -u calib_ssp2" && return 1
     if [ -n "$USE_CALIB" ]; then
         EXTRA_ARGS="${EXTRA_ARGS} --calibgdx=${USE_CALIB}/data_calib_${USE_CALIB} --tfpgdx=${USE_CALIB}/data_tfp_${USE_CALIB}"
         [ -z "$BAU" ] && BAU="${USE_CALIB}/results_${USE_CALIB}.gdx"
@@ -534,7 +542,7 @@ wrun () {
         fi
         EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
     fi
-    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=c_usa --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
+    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${DEBUG} --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
@@ -763,7 +771,8 @@ wdata () {
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} ${@}\""
+    GITHUB_PAT="${GITHUB_PAT:-undefined}"
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"GITHUB_PAT=${GITHUB_PAT} Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} -m ${METHOD} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
