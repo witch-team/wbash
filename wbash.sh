@@ -378,7 +378,7 @@ wrun () {
     JOB_NAME=""
     BSUB_INTERACTIVE=""
     CALIB=""
-    DEBUG=""
+    ONLY_SOLVE=""
     VERBOSE=""
     RESDIR_CALIB=""
     USE_CALIB=""
@@ -391,6 +391,7 @@ wrun () {
     REG_SETUP=""
     DRY_RUN=""
     EXTRA_ARGS=""
+    POSTDB=""
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -425,12 +426,16 @@ wrun () {
                 shift
                 ;;
             -d|-debug)
-                DEBUG="$2"
+                ONLY_SOLVE="$2"
                 shift
                 shift
                 ;;            
             -v|-verbose)
                 VERBOSE=TRUE
+                shift
+                ;;
+            -P|-postdb)
+                POSTDB=TRUE
                 shift
                 ;;
             # CALIBRATION
@@ -507,42 +512,46 @@ wrun () {
         [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --tfpgdx=${START%.gdx}"
     fi
     if [ -n "$BAU" ]; then
-        wssh test -f "$BAU"
-        if [ ! $? -eq 0 ]; then
-            if [ -f $BAU ]; then
-                wrsync -a $BAU $(basename $BAU)
-                BAU=$(basename $BAU)
-                wrsync -a $BAU ${DEST}/
-            else
-                BAU="${BAU}/results_$(basename ${BAU}).gdx"
-                wssh test -f "$BAU"
-                if [ ! $? -eq 0 ]; then
-                    echo "Unable to find $BAU"
-                    return 1
+        if [ ! "$BAU" = "0" ]; then
+            wssh test -f "$BAU"
+            if [ ! $? -eq 0 ]; then
+                if [ -f $BAU ]; then
+                    wrsync -a $BAU $(basename $BAU)
+                    BAU=$(basename $BAU)
+                    wrsync -a $BAU ${DEST}/
+                else
+                    BAU="${BAU}/results_$(basename ${BAU}).gdx"
+                    wssh test -f "$BAU"
+                    if [ ! $? -eq 0 ]; then
+                        echo "Unable to find $BAU"
+                        return 1
+                    fi
                 fi
             fi
-        fi
         EXTRA_ARGS="${EXTRA_ARGS} --baugdx=${BAU%.gdx}"
+        fi
     fi
     if [ -n "$FIX" ]; then
-        wssh test -f "$FIX"
-        if [ ! $? -eq 0 ]; then
-            if [ -f $FIX ]; then
-                wrsync -a $FIX $(basename $FIX)
-                FIX=$(basename $FIX)
-                wrsync -a $FIX ${DEST}/
-            else            
-                FIX="${FIX}/results_$(basename ${FIX}).gdx"
-                wssh test -f "$FIX"
-                if [ ! $? -eq 0 ]; then
-                    echo "Unable to find $FIX"
-                    return 1
+        if [ ! "$FIX" = "0" ]; then
+            wssh test -f "$FIX"
+            if [ ! $? -eq 0 ]; then
+                if [ -f $FIX ]; then
+                    wrsync -a $FIX $(basename $FIX)
+                    FIX=$(basename $FIX)
+                    wrsync -a $FIX ${DEST}/
+                else            
+                    FIX="${FIX}/results_$(basename ${FIX}).gdx"
+                    wssh test -f "$FIX"
+                    if [ ! $? -eq 0 ]; then
+                        echo "Unable to find $FIX"
+                        return 1
+                    fi
                 fi
             fi
+            EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
         fi
-        EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
     fi
-    [ -n "$DEBUG" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${DEBUG} --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
+    [ -n "$ONLY_SOLVE" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${ONLY_SOLVE} --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
@@ -552,11 +561,16 @@ wrun () {
     if [ -z "${DRY_RUN}" ]; then
         CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
         set -x
-        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -R span[ptile=${NPROC}] -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} ${@}\""
+        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -R span[ptile=${NPROC}] -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} --baseline=${BASELINE} ${@}\""
         { set +x; } 2>/dev/null
         if [ -n "$BSUB_INTERACTIVE" ]; then
+            #BAU4DB="${BAU/$JOB_NAME\//}"
+            #BAU4DB="${BAU4DB/.gdx/}"
+            # BAU4DB="${BAU}"
+            # -b "${BAU4DB}"
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown 'data_*'
-            wdown ${JOB_NAME}
+            wdown "${JOB_NAME}"
+            [ -n "$POSTDB" ] && wdb "$JOB_NAME"
             notify-send "Done ${JOB_NAME}"
         fi
     fi
@@ -767,12 +781,12 @@ wdata () {
     JOB_NAME="data_${REG_SETUP}"
     [ -z "$NOSYNC" ] && wsync
     BSUB="${DEFAULT_BSUB[$WHOST]}"
-    SETUP="-n ${REG_SETUP}"
+    SETUP="-n ${REG_SETUP} -m ${METHOD}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     set -x
     GITHUB_PAT="${GITHUB_PAT:-undefined}"
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"GITHUB_PAT=${GITHUB_PAT} Rscript --vanilla input/translate_witch_data.R -n ${REG_SETUP} -m ${METHOD} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"GITHUB_PAT=${GITHUB_PAT} Rscript --vanilla input/translate_witch_data.R ${SETUP} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         wdown ${JOB_NAME}
