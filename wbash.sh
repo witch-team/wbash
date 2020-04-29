@@ -494,16 +494,21 @@ wrun () {
     if [ -n "$START" ]; then
         wssh test -f "$START"
         if [ ! $? -eq 0 ]; then
+            BASE_START="$(basename "${START}")"
             if [ -f $START ]; then
-                wrsync -a $START $(basename $START)
-                START=$(basename $START)
+                wrsync -a $START "$BASE_START"
+                START="$BASE_START"
                 wrsync -a $START ${DEST}/
             else
-                START="${START}/results_$(basename ${START}).gdx"
+                START="${BASE_START}/results_${BASE_START}.gdx"
                 wssh test -f "$START"
                 if [ ! $? -eq 0 ]; then
-                    echo "Unable to find $START"
-                    return 1
+                    START="${BASE_START}/all_data_temp_${BASE_START}.gdx"
+                    wssh test -f "$START"
+                    if [ ! $? -eq 0 ]; then
+                        echo "Unable to find $START"
+                        return 1
+                    fi
                 fi
             fi
         fi
@@ -551,7 +556,7 @@ wrun () {
             EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
         fi
     fi
-    [ -n "$ONLY_SOLVE" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${ONLY_SOLVE} --parallel=false --holdfixed=0" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
+    [ -n "$ONLY_SOLVE" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${ONLY_SOLVE} --parallel=false --holdfixed=0 --limrow=100000 --limcol=100000" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
@@ -561,7 +566,7 @@ wrun () {
     if [ -z "${DRY_RUN}" ]; then
         CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
         set -x
-        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/{all_data*.gdx,*.{lst,err,out,txt}} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -R span[ptile=${NPROC}] -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} --baseline=${BASELINE} ${@}\""
+        ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/*.{lst,err,out,txt} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -R span[ptile=${NPROC}] -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams run_witch.gms ps=0 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} ${EXTRA_ARGS} --baseline=${BASELINE} ${@}\""
         { set +x; } 2>/dev/null
         if [ -n "$BSUB_INTERACTIVE" ]; then
             #BAU4DB="${BAU/$JOB_NAME\//}"
@@ -620,8 +625,8 @@ wdb () {
     [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}.gdx"
     BSUB="${DEFAULT_BSUB[$WHOST]} -I -tty"
     wup .
-    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=9999 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
      wdown "${SCEN}/db*gdx"
      notify-send "Done db_${SCEN}"
 }
@@ -685,7 +690,7 @@ EOM
     PROCDIR="225_${JOB_NAME}"
     wup
     set -x
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams ${@} ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams ${@} ps=0 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
     RETVAL=$?
     { set +x; } 2>/dev/null
     [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
