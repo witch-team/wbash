@@ -2,15 +2,15 @@
 
 
 # Host supported: athena, zeus, local
-WHOST=zeus
+WHOST=acib
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
-declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=p_gams ["local"]=fake)
-declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake)
-declare -A DEFAULT_BSUB=( ["athena"]="bsub -R span[hosts=1] -sla SC_gams" ["zeus"]="bsub -R span[hosts=1]" ["local"]="local_bsub")
-declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake )
-declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh )
-declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" )
-declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" )
+declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=p_gams ["local"]=fake )
+declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake )
+declare -A DEFAULT_BSUB=( ["athena"]="bsub -R span[hosts=1] -sla SC_gams" ["zeus"]="bsub -R span[hosts=1]" ["local"]="local_bsub" )
+declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake ["acib"]=10 )
+declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh ["acib"]=ssh )
+declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" ["acib"]="acib:" )
+declare -A DEFAULT_WDIR_SAME=( ["athena"]="" ["zeus"]="" ["local"]="TRUE" ["acib"]="" )
 
 WAIT=T
 
@@ -557,7 +557,7 @@ wrun () {
 wworktree () {
     BRANCH="$1"
     _REMOTE="$2"
-    REMOTE="${REMOTE:-origin}"
+    REMOTE="${_REMOTE:-origin}"
     set -x
     git worktree add -b $BRANCH ../witch-${BRANCH} ${REMOTE}/${BRANCH}
     { set +x; } 2>/dev/null
