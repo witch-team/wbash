@@ -246,6 +246,25 @@ wsync () {
 }
 
 wsetup () {
+    END_ARGS=FALSE
+    FORCE_WITCHTOOLS="FALSE"
+    FORCE_GDXTOOLS="FALSE"
+    while [ $END_ARGS = FALSE ]; do
+        key="$1"
+        case $key in
+            -w|-witchtools)
+                FORCE_WITCHTOOLS="TRUE"
+                shift
+                ;;
+            -g|-gdxtools)
+                FORCE_GDXTOOLS="TRUE"
+                shift
+                ;;
+            *)
+                END_ARGS=TRUE
+                ;;
+        esac
+    done
     wsync
     TEMP_SETUP_R=$(mktemp --suffix='.R')
     cat <<EOF > $TEMP_SETUP_R
@@ -256,14 +275,14 @@ if(!require(remotes)) {
 }
 
 #if(!require(gdxtools)) {
-    remotes::install_github("lolow/gdxtools", dependencies=TRUE, repos=r)
+    remotes::install_github("lolow/gdxtools", dependencies=TRUE, repos=r, force=${FORCE_GDXTOOLS})
 #}
 
 #if(!require(witchtools)) {
     if (dir.exists("../witchtools")) {
-        devtools::install_local("../witchtools", dependencies=TRUE, repos=r)
+        devtools::install_local("../witchtools", dependencies=TRUE, repos=r, force=${FORCE_WITCHTOOLS})
     } else {
-        remotes::install_github("witch-team/witchtools", dependencies=TRUE, repos=r)
+        remotes::install_github("witch-team/witchtools", dependencies=TRUE, repos=r, force=${FORCE_WITCHTOOLS})
     }
 #}
 
@@ -591,6 +610,8 @@ wworktree () {
 }
 
 wdb () {
+    PREV_WHOST="$WHOST"
+    WHOST=local
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE[$WHOST]}
     NPROC=${DEFAULT_NPROC[$WHOST]}
@@ -627,8 +648,9 @@ wdb () {
     wup .
     echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
     ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-     wdown "${SCEN}/db*gdx"
-     notify-send "Done db_${SCEN}"
+    wdown "${SCEN}/db*gdx"
+    notify-send "Done db_${SCEN}"
+    WHOST="$PREV_WHOST"
 }
 
 
@@ -753,7 +775,7 @@ wdata () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
     BSUB_INTERACTIVE=""
-    NOSYNC=""
+    SYNC=""
     REG_SETUP="witch17"
     METHOD="witch-data"
     while [ $END_ARGS = FALSE ]; do
@@ -774,8 +796,8 @@ wdata () {
                 BSUB_INTERACTIVE=TRUE
                 shift
                 ;;
-            -N|-nosync)
-                NOSYNC=TRUE
+            -Y|-sync)
+                SYNC=TRUE
                 shift
                 ;;
             *)
@@ -784,7 +806,7 @@ wdata () {
         esac
     done
     JOB_NAME="data_${REG_SETUP}"
-    [ -z "$NOSYNC" ] && wsync
+    [ -z "$SYNC" ] || wsync
     BSUB="${DEFAULT_BSUB[$WHOST]}"
     SETUP="-n ${REG_SETUP} -m ${METHOD}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
