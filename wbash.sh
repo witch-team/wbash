@@ -6,7 +6,7 @@ WHOST=zeus
 declare -A DEFAULT_WORKDIR=( ["athena"]=work ["zeus"]=work ["local"]='..' )
 declare -A DEFAULT_QUEUE=( ["athena"]=poe_medium ["zeus"]=p_gams ["local"]=fake )
 declare -A DEFAULT_QUEUE_SHORT=( ["athena"]=poe_short ["zeus"]=s_short ["local"]=fake )
-declare -A DEFAULT_BSUB=( ["athena"]="bsub -R span[hosts=1] -sla SC_gams" ["zeus"]="bsub -R span[hosts=1]" ["local"]="local_bsub" )
+declare -A DEFAULT_BSUB=( ["athena"]="bsub -R span[hosts=1] -sla SC_gams" ["zeus"]="bsub -P 0352" ["local"]="local_bsub" )
 declare -A DEFAULT_NPROC=( ["athena"]=8 ["zeus"]=18 ["local"]=fake ["acib"]=10 )
 declare -A DEFAULT_SSH=( ["athena"]=ssh ["zeus"]=ssh ["local"]=local_ssh ["acib"]=ssh )
 declare -A DEFAULT_RSYNC_PREFIX=( ["athena"]="athena:" ["zeus"]="zeus:" ["local"]="" ["acib"]="acib:" )
@@ -401,6 +401,7 @@ wrun () {
     VERBOSE=""
     RESDIR_CALIB=""
     USE_CALIB=""
+    USE_CALIB2=""
     START=""
     STARTBOOST=""
     BAU=""
@@ -472,6 +473,11 @@ wrun () {
                 shift
                 shift
                 ;;
+            -2|-usecalib2)
+                USE_CALIB2="$2"
+                shift
+                shift
+                ;;
             # BSUB
             -D|-dryrun)
                 DRY_RUN=TRUE
@@ -506,7 +512,13 @@ wrun () {
     [ -n "$RESDIR_CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --write_tfp_file=resdir --calibgdxout=${JOB_NAME}/data_calib_${JOB_NAME}"
     [ "$BASELINE" != "ssp2" ] && [ -n "$RESDIR_CALIB" ] && [ -z "$USE_CALIB" ] && echo "To calibrate ${BASELINE} within its folder you need -u calib_ssp2" && return 1
     if [ -n "$USE_CALIB" ]; then
-        EXTRA_ARGS="${EXTRA_ARGS} --calibgdx=${USE_CALIB}/data_calib_${USE_CALIB} --tfpgdx=${USE_CALIB}/data_tfp_${USE_CALIB}"
+        if [ "$BASELINE" != "ssp2" ]; then
+            [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${USE_CALIB}/results_${USE_CALIB} --tfix=4 --tfpgdxssp2=${USE_CALIB2}/data_tfp_${USE_CALIB2}"
+            [ -z "$CALIB" ] && [ -z "$USE_CALIB2" ] && echo "You need a -2 calib_ssp2" && return 1
+            EXTRA_ARGS="${EXTRA_ARGS} --calibgdx=${USE_CALIB2}/data_calib_${USE_CALIB2} --tfpgdx=${USE_CALIB}/data_tfp_${USE_CALIB}"
+        else
+            EXTRA_ARGS="${EXTRA_ARGS} --calibgdx=${USE_CALIB}/data_calib_${USE_CALIB} --tfpgdx=${USE_CALIB}/data_tfp_${USE_CALIB}"
+        fi
         [ -z "$BAU" ] && BAU="${USE_CALIB}/results_${USE_CALIB}.gdx"
         [ -z "$START" ] && START="${USE_CALIB}/results_${USE_CALIB}.gdx"
     fi
@@ -605,22 +617,21 @@ wworktree () {
     _REMOTE="$2"
     REMOTE="${_REMOTE:-origin}"
     set -x
-    git worktree add -b $BRANCH ../witch-${BRANCH} ${REMOTE}/${BRANCH}
+    git worktree add -b $BRANCH ../$(basename $(pwd))-${BRANCH} ${REMOTE}/${BRANCH}
     { set +x; } 2>/dev/null
 }
 
 wdb () {
-    PREV_WHOST="$WHOST"
-    WHOST=local
+    _WHOST="local"
     END_ARGS=FALSE
-    QUEUE=${DEFAULT_QUEUE[$WHOST]}
-    NPROC=${DEFAULT_NPROC[$WHOST]}
+    QUEUE=${DEFAULT_QUEUE[$_WHOST]}
+    NPROC=${DEFAULT_NPROC[$_WHOST]}
     JOB_NAME=""
-    DEST="${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
+    DEST="${DEFAULT_RSYNC_PREFIX[$_WHOST]}${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname)"
     DRY_RUN=""
     DB_OUT=""
     EXTRA_ARGS=""
-    GDXBAU="bau/results_bau"
+    GDXBAU=""
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -642,15 +653,15 @@ wdb () {
     done
     SCEN="$1"
     shift
+    [ -z "$GDXBAU" ] && GDXBAU="${SCEN}/results_${SCEN}.gdx"
     PROCDIR="225_db_${SCEN}"
     [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}.gdx"
-    BSUB="${DEFAULT_BSUB[$WHOST]} -I -tty"
-    wup .
-    echo ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-    wdown "${SCEN}/db*gdx"
+    BSUB="${DEFAULT_BSUB[$_WHOST]} -I -tty"
+    WHOST=local wup .
+    WHOST=local echo ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    WHOST=local ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    WHOST=local wdown "${SCEN}/db*gdx"
     notify-send "Done db_${SCEN}"
-    WHOST="$PREV_WHOST"
 }
 
 
@@ -774,7 +785,7 @@ wsub () {
 wdata () {
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE_SHORT[$WHOST]}
-    BSUB_INTERACTIVE=""
+    BSUB_INTERACTIVE="TRUE"
     SYNC=""
     REG_SETUP="witch17"
     METHOD="witch-data"
@@ -792,8 +803,8 @@ wdata () {
                 shift
                 shift
                 ;;
-            -i|-interactive)
-                BSUB_INTERACTIVE=TRUE
+            -N|-noninteractive)
+                BSUB_INTERACTIVE=
                 shift
                 ;;
             -Y|-sync)
@@ -897,6 +908,36 @@ werr () {
     fi
 }
 
+
+wtemp ()
+{
+JOB_NAME="$1"
+WORKDIR=${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/${JOB_NAME}
+    TEMP_SETUP_SH=$(mktemp --suffix='.sh')
+    cat <<'EOF' > $TEMP_SETUP_SH
+JOB_NAME="$1"
+F=${JOB_NAME}/all_data_temp_${JOB_NAME}.gdx
+FNAME=${JOB_NAME}/temp_${JOB_NAME}
+cp ${F} ${FNAME}_1.gdx
+until gdxdump ${FNAME}_1.gdx -V 2>&1 >/dev/null; do sleep 2; cp ${F} ${FNAME}_1.gdx; done
+AHASH=$(md5sum ${FNAME}_1.gdx | cut -d' ' -f1)
+echo "${F} -> ${FNAME}_1.gdx (${AHASH})"
+tail -n1 ${JOB_NAME}/errors_${JOB_NAME}.txt
+BHASH=$AHASH
+while [ "$AHASH" == "$BHASH" ]; do sleep 2;BHASH=$(md5sum ${F} | cut -d' ' -f1); done
+cp ${F} ${FNAME}_2.gdx
+until gdxdump ${FNAME}_2.gdx -V 2>&1 >/dev/null; do sleep 2; cp ${F} ${FNAME}_2.gdx; done
+BHASH=$(md5sum ${FNAME}_2.gdx | cut -d' ' -f1)
+echo "${F} -> ${FNAME}_2.gdx (${BHASH})"
+tail -n1 ${JOB_NAME}/errors_${JOB_NAME}.txt
+EOF
+    wrsync -a $TEMP_SETUP_SH ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
+    wssh bash $(basename $TEMP_SETUP_SH) $JOB_NAME
+    wdown -l "${JOB_NAME}/temp*"
+    wssh rm -v $(basename $TEMP_SETUP_SH)
+    rm -v $TEMP_SETUP_SH
+}
+
     
 #     [ $# -lt 3 ] && echo 'Usage: wrun [job-name] [ncpu]exit 1
 #     mkdir -p ${JOB_NAME}
@@ -941,26 +982,6 @@ werr () {
 # done
 # }
 
-# wtemp ()
-# {
-# workdir="$1"
-# ngdx="$2"
-# match="$3"
-# for f in ${workdir}/all_data_temp_${match}*; do
-# fbase=$(basename ${f}); fnameext=${fbase:14}; fname=temp_${fnameext%.gdx}
-# until rsync ${f} ${fname}_1.gdx; do sleep 1; done
-# ahash=$(md5sum ${fname}_1.gdx | cut -d' ' -f1)
-# echo "${f} -> ${fname}_1.gdx (${ahash})"
-# tail -n1 ${workdir}/errors_${match}*
-# bhash=$ahash
-# for i in $(seq 2 $ngdx); do
-# while [ "$ahash" == "$bhash" ]; do sleep 4;bhash=$(md5sum ${f} | cut -d' ' -f1); done
-# until rsync ${f} ${fname}_${i}.gdx; do sleep 1; done
-# echo "${f} -> ${fname}_${i}.gdx (${bhash})"; tail -n1 ${workdir}/errors_${match}*
-# ahash="${bhash}"
-# done
-# done
-# }
 
 # wclean ()
 # {
