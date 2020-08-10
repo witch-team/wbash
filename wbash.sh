@@ -513,7 +513,7 @@ wrun () {
     [ "$BASELINE" != "ssp2" ] && [ -n "$RESDIR_CALIB" ] && [ -z "$USE_CALIB" ] && echo "To calibrate ${BASELINE} within its folder you need -u calib_ssp2" && return 1
     if [ -n "$USE_CALIB" ]; then
         if [ "$BASELINE" != "ssp2" ]; then
-            [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${USE_CALIB}/results_${USE_CALIB} --tfix=4 --tfpgdxssp2=${USE_CALIB2}/data_tfp_${USE_CALIB2}"
+            [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${USE_CALIB2}/results_${USE_CALIB2} --tfix=4 --tfpgdxssp2=${USE_CALIB2}/data_tfp_${USE_CALIB2}"
             [ -z "$CALIB" ] && [ -z "$USE_CALIB2" ] && echo "You need a -2 calib_ssp2" && return 1
             EXTRA_ARGS="${EXTRA_ARGS} --calibgdx=${USE_CALIB2}/data_calib_${USE_CALIB2} --tfpgdx=${USE_CALIB}/data_tfp_${USE_CALIB}"
         else
@@ -904,7 +904,7 @@ werr () {
     if [ -z "$JOB_NAME" ]; then
         ssh ${WHOST} bjobs -w
     else
-        ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt"
+        ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && tail -n 20 ${JOB_NAME}/errors_${JOB_NAME}.txt"
     fi
 }
 
