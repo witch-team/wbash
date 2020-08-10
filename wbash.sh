@@ -899,6 +899,18 @@ wcheck () {
     fi
 }
 
+wrename () {
+    OLDNAME="$1"
+    NEWNAME="$2"
+    [ "$#" -ne 2 ] && echo 'Usage: wrename OLD_DIRECTORY_NAME NEW_DIRECTORY_NAME' && return 1
+    mv -v "$OLDNAME" "$NEWNAME"
+    cd "$NEWNAME"
+    for f in *; do
+        mv -v "${f}" "${f/$OLDNAME/$NEWNAME}"
+    done
+    cd -
+}
+
 werr () {
     JOB_NAME="$1"
     if [ -z "$JOB_NAME" ]; then
