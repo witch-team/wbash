@@ -280,7 +280,7 @@ if(!require(remotes)) {
 
 #if(!require(witchtools)) {
     if (dir.exists("../witchtools")) {
-        devtools::install_local("../witchtools", dependencies=TRUE, repos=r, force=${FORCE_WITCHTOOLS})
+        remotes::install_local("../witchtools", dependencies=TRUE, repos=r, force=${FORCE_WITCHTOOLS})
     } else {
         remotes::install_github("witch-team/witchtools", dependencies=TRUE, repos=r, force=${FORCE_WITCHTOOLS})
     }
@@ -614,10 +614,13 @@ wrun () {
 
 wworktree () {
     BRANCH="$1"
+    [ -z "${BRANCH}" ] && echo "Usage: wworktree branch-name" && return 1
     _REMOTE="$2"
     REMOTE="${_REMOTE:-origin}"
     set -x
-    git worktree add -b $BRANCH ../$(basename $(pwd))-${BRANCH} ${REMOTE}/${BRANCH}
+    git worktree add --checkout ../$(basename $(pwd))-${BRANCH} ${BRANCH}
+    cd ../$(basename $(pwd))-${BRANCH}
+    # git worktree add -b $BRANCH ../$(basename $(pwd))-${BRANCH} ${REMOTE}/${BRANCH}
     { set +x; } 2>/dev/null
 }
 
@@ -950,6 +953,12 @@ EOF
     rm -v $TEMP_SETUP_SH
 }
 
+
+wclean ()
+{
+wssh rm -rv 225* */*{lst,out,err}
+}
+
     
 #     [ $# -lt 3 ] && echo 'Usage: wrun [job-name] [ncpu]exit 1
 #     mkdir -p ${JOB_NAME}
@@ -992,13 +1001,6 @@ EOF
 #     done
 #     shift
 # done
-# }
-
-
-# wclean ()
-# {
-# rm -rv 225*
-# rm -v */*{lst,out,err}
 # }
 
 # wcleandir ()
