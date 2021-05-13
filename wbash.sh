@@ -221,7 +221,7 @@ wrsync () {
     RSYNC_ARGS=()
     [ -n "$RELATIVE" ] && RSYNC_ARGS=( --relative )
     set -x
-    /usr/bin/rsync -avP -zz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --exclude=.git "${RSYNC_ARGS[@]}" "${@}"
+    /usr/bin/rsync -avP -zz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "${RSYNC_ARGS[@]}" "${@}"
     { set +x; } 2>/dev/null
 }
 
@@ -352,7 +352,7 @@ EOM
     if [ -n "$ONLY_GIT" ]; then
         TMPDIR="$(mktemp -d)"
         git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes
-        RSYNC_ARGS=( --exclude-from=$(echo ${TMPDIR}/excludes) )
+        RSYNC_ARGS=( --exclude=.git --exclude-from=$(echo ${TMPDIR}/excludes) )
     fi
     wrsync "${RSYNC_ARGS[@]}" ${@} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
     RET=$?
