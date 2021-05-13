@@ -791,7 +791,7 @@ wdata () {
     BSUB_INTERACTIVE="TRUE"
     SYNC=""
     REG_SETUP="witch17"
-    METHOD="witch-data"
+    METHOD="dvc"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
