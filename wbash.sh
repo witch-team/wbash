@@ -608,7 +608,7 @@ wrun () {
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown 'data_*'
             wdown "${JOB_NAME}"
             [ -n "$POSTDB" ] && wdb "$JOB_NAME"
-            notify-send "Done ${JOB_NAME}"
+            [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
         fi
     fi
 }
@@ -665,7 +665,7 @@ wdb () {
     WHOST=local echo ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
     WHOST=local ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
     WHOST=local wdown "${SCEN}/db*gdx"
-    notify-send "Done db_${SCEN}"
+    [ -x /usr/bin/notify-send ] && notify-send "Done db_${SCEN}"
 }
 
 
@@ -731,7 +731,7 @@ EOM
     ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams ${@} ps=0 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
     RETVAL=$?
     { set +x; } 2>/dev/null
-    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
+    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
 
     return $RETVAL
 }
@@ -746,6 +746,7 @@ wsub () {
     REG_SETUP=""
     DRY_RUN=""
     EXTRA_ARGS=""
+    SYNC=""
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -762,6 +763,10 @@ wsub () {
             -q|-queue)
                 QUEUE="$2"
                 shift
+                shift
+                ;;
+            -Y|-sync)
+                SYNC=TRUE
                 shift
                 ;;
             -n|-nproc)
@@ -782,7 +787,10 @@ wsub () {
     ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}.out -e ${JOB_NAME}.err \"${@}\""
     RETVAL=$?
     { set +x; } 2>/dev/null
-    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && notify-send "Done ${JOB_NAME}"
+    if [ -n "$BSUB_INTERACTIVE" ]; then
+        [ -n "$SYNC" ] && wdown ${JOB_NAME}
+        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
+    fi
     return $RETVAL
 }
 
@@ -832,8 +840,8 @@ wdata () {
     ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"GITHUB_PAT=${GITHUB_PAT} Rscript --vanilla input/translate_witch_data.R ${SETUP} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
-        wdown ${JOB_NAME}
-        notify-send "Done ${JOB_NAME}"
+        [ -n "$SYNC" ] && wdown ${JOB_NAME}
+        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
     fi
 }
 
