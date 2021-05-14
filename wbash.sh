@@ -310,9 +310,8 @@ wdirname () {
     echo "${DESTDIR}"
 }
 
-
 wup () {
-    read -r -d '' USAGE <<- EOM
+    USAGE="$(cat <<- EOM
     Upload SOURCE to ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/TARGET
     By default, TARGET="$(wdirname)".
     To upload current directory, use "." as SOURCE.
@@ -324,6 +323,7 @@ wup () {
     -l|-all             Upload also gitignored files
     -t|-target TARGET   Upload to subdir TARGET
 EOM
+)"
     END_ARGS=FALSE
     ONLY_GIT="TRUE"
     WTARGET="$(wdirname)"
@@ -361,7 +361,7 @@ EOM
 }
 
 wdown () {
-    read -r -d '' USAGE <<- EOM
+    USAGE="$(cat <<- EOM
     Download SUBDIR from "${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)" using relative paths.
     Exclude all_data_*.gdx files unless otherwise stated.
 
@@ -370,6 +370,7 @@ wdown () {
     Options
     -l|-all     Download also all_data_*.gdx file
 EOM
+)"
     [ $# -eq 0 ] && echo "$USAGE" && return 1
     END_ARGS=FALSE
     EXCLUDE_ALLDATATEMP="TRUE"
@@ -669,7 +670,7 @@ wdb () {
 
 
 wgams () {
-    read -r -d '' USAGE <<- EOM
+    USAGE="$(cat <<- EOM
     Change dir to ${WHOST}:${DEFAULT_WORKDIR[$WHOST]}/$(wdirname), then bsub a gams job.
     Put .out, .err and .lst files under JOB_NAME dir, use 225_JOB_NAME as procdir.
     If interactive is on, download JOB_NAME dir after finishing.
@@ -682,6 +683,7 @@ wgams () {
     -i|-interactive     Wait for job to finish before returning
     -q|-queue X         Choose queue X
 EOM
+)"
     END_ARGS=FALSE
     QUEUE=${DEFAULT_QUEUE[$WHOST]}
     NPROC=${DEFAULT_NPROC[$WHOST]}
