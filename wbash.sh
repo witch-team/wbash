@@ -351,8 +351,7 @@ EOM
     TMPDIR=""
     if [ -n "$ONLY_GIT" ]; then
         TMPDIR="$(mktemp -d)"
-        git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes
-        RSYNC_ARGS=( --exclude=.git --exclude-from=$(echo ${TMPDIR}/excludes) )
+        git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes && RSYNC_ARGS=( --exclude=.git --exclude-from=$(echo ${TMPDIR}/excludes) ) || RSYNC_ARGS=( --exclude=.git )
     fi
     wrsync "${RSYNC_ARGS[@]}" ${@} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
     RET=$?
