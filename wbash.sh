@@ -608,7 +608,7 @@ wrun () {
             [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown 'data_*'
             wdown "${JOB_NAME}"
             [ -n "$POSTDB" ] && wdb "$JOB_NAME"
-            [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
+            [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}" || true
         fi
     fi
 }
@@ -665,7 +665,7 @@ wdb () {
     WHOST=local echo ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
     WHOST=local ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
     WHOST=local wdown "${SCEN}/db*gdx"
-    [ -x /usr/bin/notify-send ] && notify-send "Done db_${SCEN}"
+    [ -x /usr/bin/notify-send ] && notify-send "Done db_${SCEN}" || true
 }
 
 
@@ -731,8 +731,10 @@ EOM
     ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} && mkdir -p ${PROCDIR} ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n $NPROC -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"gams ${@} ps=0 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=${PROCDIR}\""
     RETVAL=$?
     { set +x; } 2>/dev/null
-    [ -n "$BSUB_INTERACTIVE" ] && wdown "$JOB_NAME" && [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
-
+    if [ -n "$BSUB_INTERACTIVE" ]; then
+        wdown "$JOB_NAME"
+        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}" || true
+    fi
     return $RETVAL
 }
 
@@ -789,7 +791,7 @@ wsub () {
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$SYNC" ] && wdown ${JOB_NAME}
-        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
+        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}" || true
     fi
     return $RETVAL
 }
@@ -841,7 +843,7 @@ wdata () {
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$SYNC" ] && wdown ${JOB_NAME}
-        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}"
+        [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}" || true
     fi
 }
 
