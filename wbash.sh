@@ -412,6 +412,7 @@ wrun () {
     DRY_RUN=""
     EXTRA_ARGS=""
     POSTDB=""
+    OUTSYNC="TRUE"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -456,6 +457,11 @@ wrun () {
                 ;;
             -P|-postdb)
                 POSTDB=TRUE
+                shift
+                ;;
+            # FLOW
+            -z|-no-outsync)
+                OUTSYNC=""
                 shift
                 ;;
             # CALIBRATION
@@ -523,8 +529,8 @@ wrun () {
         [ -z "$START" ] && START="${USE_CALIB}/results_${USE_CALIB}.gdx"
     fi
     if [ -n "$START" ]; then
-        wssh test -f "$START"
-        if [ ! $? -eq 0 ]; then
+        wssh test -f "$START" && STARTGDX_EXISTS=TRUE || STARTGDX_EXISTS=""
+        if [ -z "$STARTGDX_EXISTS" ]; then
             BASE_START="$(basename "${START}")"
             if [ -f $START ]; then
                 wrsync -a $START "$BASE_START"
@@ -532,11 +538,11 @@ wrun () {
                 wrsync -a $START ${DEST}/
             else
                 START="${BASE_START}/results_${BASE_START}.gdx"
-                wssh test -f "$START"
-                if [ ! $? -eq 0 ]; then
+                wssh test -f "$START" && STARTGDX_EXISTS=TRUE || STARTGDX_EXISTS=""
+                if [ -z "$STARTGDX_EXISTS" ]; then
                     START="${BASE_START}/all_data_temp_${BASE_START}.gdx"
-                    wssh test -f "$START"
-                    if [ ! $? -eq 0 ]; then
+                    wssh test -f "$START" && STARTGDX_EXISTS=TRUE || STARTGDX_EXISTS=""
+                    if [ -z "$STARTGDX_EXISTS" ]; then
                         echo "Unable to find $START"
                         return 1
                     fi
@@ -549,16 +555,16 @@ wrun () {
     fi
     if [ -n "$BAU" ]; then
         if [ ! "$BAU" = "0" ]; then
-            wssh test -f "$BAU"
-            if [ ! $? -eq 0 ]; then
+            wssh test -f "$BAU" && BAUGDX_EXISTS=TRUE || BAUGDX_EXISTS=""
+            if [ -z "$BAUGDX_EXISTS" ]; then
                 if [ -f $BAU ]; then
                     wrsync -a $BAU $(basename $BAU)
                     BAU=$(basename $BAU)
                     wrsync -a $BAU ${DEST}/
                 else
                     BAU="${BAU}/results_$(basename ${BAU}).gdx"
-                    wssh test -f "$BAU"
-                    if [ ! $? -eq 0 ]; then
+                    wssh test -f "$BAU" && BAUGDX_EXISTS=TRUE || BAUGDX_EXISTS=""
+                    if [ -z "$BAUGDX_EXISTS" ]; then
                         echo "Unable to find $BAU"
                         return 1
                     fi
@@ -569,16 +575,16 @@ wrun () {
     fi
     if [ -n "$FIX" ]; then
         if [ ! "$FIX" = "0" ]; then
-            wssh test -f "$FIX"
-            if [ ! $? -eq 0 ]; then
+            wssh test -f "$FIX" && FIXGDX_EXISTS=TRUE || FIXGDX_EXISTS=""
+            if [ -z "$FIXGDX_EXISTS" ]; then
                 if [ -f $FIX ]; then
                     wrsync -a $FIX $(basename $FIX)
                     FIX=$(basename $FIX)
                     wrsync -a $FIX ${DEST}/
                 else            
                     FIX="${FIX}/results_$(basename ${FIX}).gdx"
-                    wssh test -f "$FIX"
-                    if [ ! $? -eq 0 ]; then
+                    wssh test -f "$FIX" && FIXGDX_EXISTS=TRUE || FIXGDX_EXISTS=""
+                    if [ -z "$FIXGDX_EXISTS" ]; then
                         echo "Unable to find $FIX"
                         return 1
                     fi
@@ -604,9 +610,11 @@ wrun () {
             #BAU4DB="${BAU4DB/.gdx/}"
             # BAU4DB="${BAU}"
             # -b "${BAU4DB}"
-            [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown 'data_*'
-            wdown "${JOB_NAME}"
             [ -n "$POSTDB" ] && wdb "$JOB_NAME"
+            if [ -n "$OUTSYNC" ]; then
+                [ -n "$CALIB" ] && [ -z "$RESDIR_CALIB" ] && wdown 'data_*'
+                wdown "${JOB_NAME}"
+            fi
             [ -x /usr/bin/notify-send ] && notify-send "Done ${JOB_NAME}" || true
         fi
     fi
