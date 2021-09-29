@@ -625,9 +625,25 @@ wworktree () {
     [ -z "${BRANCH}" ] && echo "Usage: wworktree branch-name" && return 1
     _REMOTE="$2"
     REMOTE="${_REMOTE:-origin}"
+    # check if branch exists
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    CURRENT_DIR=$(basename $(pwd))
+    ROOT_NAME=${CURRENT_DIR%"-${CURRENT_BRANCH}"}
+    git fetch
+    git branch --remotes | grep --extended-regexp "^[[:space:]]+${REMOTE}/${BRANCH}$"
+    if [ ! $? -eq 0 ]; then
+        echo "Creating branch ${REMOTE}/${BRANCH}..."
+        git checkout -b "${BRANCH}"
+        git push -u ${REMOTE} HEAD
+        git checkout ${CURRENT_BRANCH}
+    else
+        git checkout ${REMOTE}/${BRANCH}
+        git checkout ${CURRENT_BRANCH}
+    fi
     set -x
-    git worktree add --checkout ../$(basename $(pwd))-${BRANCH} ${BRANCH}
-    cd ../$(basename $(pwd))-${BRANCH}
+    TGT_DIR="../${ROOT_NAME}-${BRANCH}"
+    git worktree add --checkout ${TGT_DIR} ${BRANCH}
+    cd ${TGT_DIR}
     # git worktree add -b $BRANCH ../$(basename $(pwd))-${BRANCH} ${REMOTE}/${BRANCH}
     { set +x; } 2>/dev/null
 }
