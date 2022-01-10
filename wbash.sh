@@ -351,7 +351,7 @@ EOM
     TMPDIR=""
     if [ -n "$ONLY_GIT" ]; then
         TMPDIR="$(mktemp -d)"
-        git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes && RSYNC_ARGS=( --exclude=.git --exclude-from=$(echo ${TMPDIR}/excludes) ) || RSYNC_ARGS=( --exclude=.git )
+        git -C . ls-files --exclude-standard -oi > ${TMPDIR}/excludes && RSYNC_ARGS=( --exclude=.git --exclude=.dvc --exclude-from=$(echo ${TMPDIR}/excludes) ) || RSYNC_ARGS=( --exclude=.git --exclude=.dvc )
     fi
     wrsync "${RSYNC_ARGS[@]}" ${@} ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/${WTARGET}
     RET=$?
@@ -626,11 +626,16 @@ wworktree () {
     _REMOTE="$2"
     REMOTE="${_REMOTE:-origin}"
     set -x
-    git worktree add --checkout ../$(basename $(pwd))-${BRANCH} ${BRANCH}
-    cd ../$(basename $(pwd))-${BRANCH}
+    CURRENT_DIR_BASENAME="$(basename $(pwd))"
+    CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+    CURRENT_DIR_BASENAME_CLEANED="${CURRENT_DIR_BASENAME/-${CURRENT_BRANCH}}"
+    TGTDIR="../${CURRENT_DIR_BASENAME_CLEANED}-${BRANCH}"
+    git worktree add --checkout "${TGTDIR}" ${BRANCH}
+    cd "${TGTDIR}"
     # git worktree add -b $BRANCH ../$(basename $(pwd))-${BRANCH} ${REMOTE}/${BRANCH}
     { set +x; } 2>/dev/null
 }
+
 
 wdb () {
     _WHOST="local"
