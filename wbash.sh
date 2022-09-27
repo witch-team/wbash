@@ -234,14 +234,17 @@ wdefault () {
 }
 
 wsync () {
+    WPWD="$(PWD)"
     [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
     cd ../witch-data && git pull
     [ "$WHOST" = local ] || wup -t witch-data .
-    cd -
     [ -d ../witchtools ] || git clone git@github.com:witch-team/witchtools.git ../witchtools
     cd ../witchtools && git pull
     [ "$WHOST" = local ] || wup -t witchtools .
-    cd -
+    [ -d ../gdxtools ] || git clone git@github.com:lolow/gdxtools.git ../gdxtools
+    cd ../gdxtools && git pull
+    [ "$WHOST" = local ] || wup -t gdxtools .
+    cd "$WPWD"
     [ "$WHOST" = local ] || wup .
 }
 
@@ -249,6 +252,7 @@ wsetup () {
     END_ARGS=FALSE
     FORCE_WITCHTOOLS="FALSE"
     FORCE_GDXTOOLS="FALSE"
+    FORCE_HECTOR="FALSE"
     while [ $END_ARGS = FALSE ]; do
         key="$1"
         case $key in
@@ -258,6 +262,16 @@ wsetup () {
                 ;;
             -g|-gdxtools)
                 FORCE_GDXTOOLS="TRUE"
+                shift
+                ;;
+            -h|-hector)
+                FORCE_HECTOR="TRUE"
+                shift
+                ;;
+            -a|-all)
+                FORCE_WITCHTOOLS="TRUE"
+                FORCE_GDXTOOLS="TRUE"
+                FORCE_HECTOR="TRUE"
                 shift
                 ;;
             *)
@@ -275,7 +289,11 @@ if(!require(remotes)) {
 }
 
 #if(!require(gdxtools)) {
-    remotes::install_github("lolow/gdxtools", dependencies=TRUE, repos=r, force=${FORCE_GDXTOOLS})
+    if (dir.exists("../gdxtools")) {
+        remotes::install_local("../gdxtools", dependencies=TRUE, repos=r, force=${FORCE_GDXTOOLS})
+    } else {
+        remotes::install_github("lolow/gdxtools", dependencies=TRUE, repos=r, force=${FORCE_GDXTOOLS})
+    }
 #}
 
 #if(!require(witchtools)) {
@@ -287,7 +305,7 @@ if(!require(remotes)) {
 #}
 
 #if(!require(hector)) {
-    remotes::install_github('witch-team/hector', dependencies=TRUE, repos=r)
+    remotes::install_github('witch-team/hector', dependencies=TRUE, repos=r, force=${FORCE_HECTOR})
 #}
 EOF
     wrsync -a $TEMP_SETUP_R ${DEFAULT_RSYNC_PREFIX[$WHOST]}${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)/
@@ -306,7 +324,7 @@ wdirname () {
             [[ "$PWD" =~ .*${BRANCH} ]] && DESTDIR="${PWD}" || DESTDIR="${PWD}-${BRANCH}"
         fi
     fi
-    DESTDIR=${DESTDIR%-master}
+    #DESTDIR=${DESTDIR%-master}
     echo "${DESTDIR}"
 }
 
@@ -423,7 +441,9 @@ wrun () {
                 shift
                 ;;   
             -S|-startboost)
+                START="$2"
                 STARTBOOST=TRUE
+                shift
                 shift
                 ;; 
             -r|-regions)
@@ -515,7 +535,7 @@ wrun () {
     done
     [ -z "$JOB_NAME" ] && echo "Usage: wrun -j job-name [...]" && return 1
     [ -n "$CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --calibration=1"
-    [ -n "$RESDIR_CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --write_tfp_file=resdir --calibgdxout=${JOB_NAME}/data_calib_${JOB_NAME}"
+    [ -n "$RESDIR_CALIB" ] && EXTRA_ARGS="${EXTRA_ARGS} --write_tfp_file=resdir --caliboutgdx=${JOB_NAME}/data_calib_${JOB_NAME}"
     [ "$BASELINE" != "ssp2" ] && [ -n "$RESDIR_CALIB" ] && [ -z "$USE_CALIB" ] && echo "To calibrate ${BASELINE} within its folder you need -u calib_ssp2" && return 1
     if [ -n "$USE_CALIB" ]; then
         if [ "$BASELINE" != "ssp2" ]; then
@@ -593,11 +613,12 @@ wrun () {
             EXTRA_ARGS="${EXTRA_ARGS} --gdxfix=${FIX%.gdx}"
         fi
     fi
-    [ -n "$ONLY_SOLVE" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=0 --only_solve=${ONLY_SOLVE} --parallel=false --holdfixed=0 --limrow=100000 --limcol=100000" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
+    [ -n "$ONLY_SOLVE" ] && EXTRA_ARGS="${EXTRA_ARGS} --max_iter=1 --rerun=3 --only_solve=${ONLY_SOLVE} --limrow=100000 --limcol=100000" || EXTRA_ARGS="${EXTRA_ARGS} --solvergrid=memory"
     [ -n "$VERBOSE" ] && EXTRA_ARGS="${EXTRA_ARGS} --verbose=1"
     [ -n "$STARTBOOST" ] && EXTRA_ARGS="${EXTRA_ARGS} --startboost=1"
     [ -n "$REG_SETUP" ] && EXTRA_ARGS="${EXTRA_ARGS} --n=${REG_SETUP}"
     wup .
+    wup -l input/data
     BSUB="${DEFAULT_BSUB[$WHOST]}"
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     if [ -z "${DRY_RUN}" ]; then
@@ -682,11 +703,11 @@ wdb () {
     shift
     [ -z "$GDXBAU" ] && GDXBAU="${SCEN}/results_${SCEN}.gdx"
     PROCDIR="225_db_${SCEN}"
-    [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}.gdx"
+    [ -z "$DB_OUT" ] && DB_OUT="db_${SCEN}"
     BSUB="${DEFAULT_BSUB[$_WHOST]} -I -tty"
     WHOST=local wup .
-    WHOST=local echo ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname)/${SCEN} && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams ../post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=./ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
-    WHOST=local ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${PROCDIR} db_* && mkdir -p ${PROCDIR} && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o db_${SCEN}.out -e db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=db_${SCEN}.lst Procdir=${PROCDIR} --gdxout=results_${SCEN} --resdir=${SCEN}/ --gdxout_db=db_${SCEN} --baugdx=${GDXBAU} ${@}\""
+    WHOST=local echo ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${SCEN}/db_* && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o ${SCEN}/db_${SCEN}.out -e ${SCEN}/db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=${SCEN}/db_${SCEN}.lst --outgdx=results_${SCEN} --outgdx_db=${DB_OUT} --resdir=${SCEN}/ --baugdx=${GDXBAU} ${@}\""
+    WHOST=local ${DEFAULT_SSH[$_WHOST]} ${_WHOST} "cd ${DEFAULT_WORKDIR[$_WHOST]}/$(wdirname) && rm -rfv ${SCEN}/db_* && $BSUB -J db_${SCEN} -n 1 -q $QUEUE -o ${SCEN}/db_${SCEN}.out -e ${SCEN}/db_${SCEN}.err \"gams post/database.gms ps=0 pw=32767 gdxcompress=1 Output=${SCEN}/db_${SCEN}.lst --outgdx=results_${SCEN} --outgdx_db=${DB_OUT} --resdir=${SCEN}/ --baugdx=${GDXBAU} ${@}\""
     WHOST=local wdown "${SCEN}/db*gdx"
     [ -x /usr/bin/notify-send ] && notify-send "Done db_${SCEN}" || true
 }
@@ -952,7 +973,14 @@ wrename () {
 werr () {
     JOB_NAME="$1"
     if [ -z "$JOB_NAME" ]; then
-        ssh ${WHOST} bjobs -w
+        A=$(ssh ${WHOST} "bjobs -w | tail -n +2 | cut -f17 -d\ ")
+        echo "$A"
+        IFS=$'\n'
+        for JOB_NAME in $A; do
+            echo "Checking ${JOB_NAME}..."
+            ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && tail -n 20 ${JOB_NAME}/errors_${JOB_NAME}.txt"
+            echo $?
+        done
     else
         ssh ${WHOST} "cd ${DEFAULT_WORKDIR[$WHOST]}/$(wdirname) && tail -n 20 ${JOB_NAME}/errors_${JOB_NAME}.txt"
     fi
@@ -994,6 +1022,24 @@ wclean ()
 wssh rm -rv 225* */*{lst,out,err}
 }
 
+wcompare () {
+    ADIR="$1"
+    BDIR="$2"
+    for F in ${ADIR}/*.gdx; do
+        FBASE=$(basename "$F")
+        G=${BDIR}/${FBASE}
+        if [ -f $G ]; then
+            gdxdump $F > prova1.txt
+            gdxdump $G > prova2.txt
+            ASUM=$(md5sum prova1.txt | cut -d' ' -f1)
+            BSUM=$(md5sum prova2.txt | cut -d' ' -f1)
+            if [ $ASUM != $BSUM ]; then
+                echo "Showing differences for ${FBASE}"
+                bcompare prova1.txt prova2.txt
+            fi
+        fi
+    done
+}
     
 #     [ $# -lt 3 ] && echo 'Usage: wrun [job-name] [ncpu]exit 1
 #     mkdir -p ${JOB_NAME}
@@ -1007,7 +1053,7 @@ wssh rm -rv 225* */*{lst,out,err}
 # }
 
 # WITCH_CMD = rm -rfv ${JOB_NAME} 225_${JOB_NAME} && mkdir -p ${JOB_NAME} 225_${JOB_NAME} && gams run_witch.gms ps=9999 pw=32767 gdxcompress=1 Output=${JOB_NAME}/${JOB_NAME}.lst Procdir=225_${JOB_NAME} --nameout=${JOB_NAME} --resdir=${JOB_NAME}/ --gdxout=results_${JOB_NAME} $(2) && cat ${JOB_NAME}/errors_${JOB_NAME}.txt
-# WCALIB = --calibration=1 --write_tfp_file=resdir --calibgdxout=${JOB_NAME}/tfp_${JOB_NAME}
+# WCALIB = --calibration=1 --write_tfp_file=resdir --caliboutgdx=${JOB_NAME}/tfp_${JOB_NAME}
 # WDEBUG := 
 # ## BSUB_CMD (1: job-name) (2: command to bsub) (3: number of cores)
 # BSUB_CMD       = mkdir -p ${JOB_NAME} && bsub -J ${JOB_NAME} -I -R span[hosts=1] -sla SC_gams -n $(3) -q poe_medium -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err '$(2)'
