@@ -234,7 +234,7 @@ wdefault () {
 }
 
 wsync () {
-    WPWD="$(PWD)"
+    WPWD="$(pwd)"
     [ -d ../witch-data ] || git clone git@github.com:witch-team/witch-data.git ../witch-data
     cd ../witch-data && git pull
     [ "$WHOST" = local ] || wup -t witch-data .
