@@ -221,7 +221,7 @@ wrsync () {
     RSYNC_ARGS=()
     [ -n "$RELATIVE" ] && RSYNC_ARGS=( --relative )
     set -x
-    /usr/bin/rsync -avP -zz --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "${RSYNC_ARGS[@]}" "${@}"
+    /usr/bin/rsync -avzP --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r "${RSYNC_ARGS[@]}" "${@}"
     { set +x; } 2>/dev/null
 }
 
@@ -882,8 +882,7 @@ wdata () {
     [ -n "$BSUB_INTERACTIVE" ] && BSUB="$BSUB -I -tty"
     CHDIR="${DEFAULT_WORKDIR[$WHOST]}/$(wdirname)"
     set -x
-    GITHUB_PAT="${GITHUB_PAT:-undefined}"
-    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"GITHUB_PAT=${GITHUB_PAT} Rscript --vanilla input/translate_witch_data.R ${SETUP} ${@}\""
+    ${DEFAULT_SSH[$WHOST]} ${WHOST} "cd ${CHDIR} && rm -rfv ${JOB_NAME}/${JOB_NAME}.{err,out} && mkdir -p ${JOB_NAME} && $BSUB -J ${JOB_NAME} -n 1 -q $QUEUE -o ${JOB_NAME}/${JOB_NAME}.out -e ${JOB_NAME}/${JOB_NAME}.err \"Rscript --vanilla input/translate_witch_data.R ${SETUP} ${@}\""
     { set +x; } 2>/dev/null
     if [ -n "$BSUB_INTERACTIVE" ]; then
         [ -n "$SYNC" ] && wdown ${JOB_NAME}
